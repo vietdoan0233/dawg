@@ -4,3 +4,5 @@ node_modules/
 !.env.example
 __pycache__/
 .venv/
+# guild artwork: not ours to publish (SDD §9 Q6)
+fuksi point roadmap for Data Guild.jpg
