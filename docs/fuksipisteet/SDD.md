@@ -1,4 +1,4 @@
-# Fuksipisteet — SDD v3.1 (consensus: all 5 debaters SATISFIED, round 6 — modelled on the real Data Guild roadmap)
+# Fuksipisteet — SDD v3.2 (consensus v3.1 + multi-guild §10, round-7 fixes)
 
 Product: Aalto guilds track fuksi points (tasks + events → points → teekkari cap at Wappu). Today: a printed roadmap + Google Sheets + Telegram photos + manual counting.
 Reference: `fuksi point roadmap for Data Guild.jpg`, a real guild's 6 tracks, 4 tiers, point ranges, write-ins and secret nodes.
@@ -26,14 +26,24 @@ Per-task reviewer: `tasks.reviewer` = `tutor` (default) or `captain`. Use `capta
 | Auth | Email 6-digit OTP, `@aalto.fi` via auth hook, custom SMTP + raised rate limits |
 | Demo login | Demo project only: seeded users + "log in as" switcher (`NEXT_PUBLIC_DEMO=1`); pilot project has password sign-in disabled |
 | AI | Claude Haiku 4.5 in `import` only: column mapping on headers + masked samples |
-| **Roadmap view** | **Main fuksi screen = the guild's map.** Phone: one stacked card per category (icon, "9/14p", time-ordered node chain that scrolls sideways). Projector: full 2D map. Colors/icons from a fixed 6-slot palette by category order (`ponytail: hardcoded palette, add categories.color/icon when a 2nd guild needs its own look`). |
+| **Roadmap view** | **Main fuksi screen = the guild's map.** Phone: one stacked card per category (icon, "9/14p", time-ordered node chain that scrolls sideways). Projector: full 2D map. Colour and icon come from each category row (`categories.color`, `categories.icon`), and import pre-fills them from a default palette. |
 | Leaderboard | Projector polls `leaderboard()` every 5 s; animated |
 | Export | Member × category matrix + tier per member; **formula-injection-safe CSV** |
 
 ## 3. Schema (migration 0001 — frozen day 0)
-Unchanged from v2.1 unless marked **v3**: privilege block (revoke all + explicit grants), `guilds`, `seasons` (+`is_current`), `categories`, `tutor_groups`, `members`, `member_codes`, `adjustments`, `invites`, `ai_usage`.
+Unchanged from v2.1 unless marked **v3**: privilege block (revoke all + explicit grants), `guilds`, `seasons` (+`is_current`), `tutor_groups`, `members`, `member_codes`, `adjustments`, `invites`, `ai_usage`.
 
 ```sql
+-- v3.2: categories carry their own look (guilds differ in track count, colours, icons)
+create table categories (
+  id bigint generated always as identity primary key,
+  guild_id bigint not null, season_id bigint not null, name text not null,
+  color text not null default '#888888' check (color ~ '^#[0-9a-f]{6}$'),
+  icon text not null default 'hex' check (icon in ('cog','bell','goblet','tower','shield','hex','star','book','heart','flag')),
+  foreign key (guild_id, season_id) references seasons (guild_id, id) on delete cascade,
+  unique (guild_id, season_id, name), unique (guild_id, season_id, id));
+-- display order = id. ponytail: add categories.sort when a captain needs to reorder.
+
 -- v3: tasks = map nodes
 create table tasks (
   id bigint generated always as identity primary key,
@@ -131,7 +141,7 @@ RLS helpers (security definer, current season): `is_member`, `has_role`, `my_mem
 | `roadmap(guild_id)` | member | Visible nodes with own status (dim / pending / lit, repeat dots). **Hidden nodes appear as locked placeholders** `{category_id, locked: true}`, with no title or points. Tiers + own tier. |
 | `update_task(task_id, …)` | captain | Includes reveal (`revealed_at = now()`) and scheduled reveal. |
 | `award_report(guild_id)` | captain | Awards above `points_min`, grouped by reviewer (audit). |
-| unchanged | | `join_guild`, `event_roster`, `my_code`, `rotate_my_code`, `set_role`, `set_current_season`, `add_adjustment`, `import_apply` (also tiers, ranges, required, write-in slots; skips 0-minimum rules), `leaderboard`, `captain_roster`, invites |
+| unchanged | | `join_guild`, `event_roster`, `my_code`, `rotate_my_code`, `set_role`, `set_current_season`, `add_adjustment`, `import_apply` (also tiers, ranges, required, write-in slots; skips 0-minimum rules; colours `lower()`-ed), `leaderboard`, `captain_roster`, invites |
 
 ## 5. Security & privacy
 v2.1 privileges, matrix, storage, retention and GDPR, **plus**:
@@ -173,7 +183,47 @@ Demo (3 min): fuksi opens their map → organizer scans at an event and a node l
 5. Who awards jäynä points, and what is a sensible ceiling?
 6. May we reproduce the map's artwork and icons in the app?
 
+## 10. Multiple guilds (each guild runs its own rules)
+**Principle: a guild's rules are data, not code.** Every rule lives in rows scoped by `(guild_id, season_id)`, so guilds never share or overwrite each other's setup, and each new season can change the rules without a migration.
+
+| What differs between guilds | Where it lives | Who sets it |
+|---|---|---|
+| Tracks (how many, names, colours, icons) | `categories` | captain / import |
+| Nodes, point values and ranges, repeats | `tasks` (`points_min/max`, `max_repeats`) | captain / import |
+| Track minimums | `rules` | captain / import |
+| Levels and thresholds (40/60/80/100 or anything else) | `tiers`, with per-tier minimums via `rules.tier_id` | captain / import |
+| Must-do nodes | `tasks.required` | captain |
+| Secret nodes and reveal dates | `tasks.revealed_at` | captain |
+| Who may approve a node | `tasks.reviewer` | captain |
+| Which events light which node | `events.task_id` | captain / organizer setup |
+| Season dates | `seasons` | captain |
+| Points earned before switching apps | `adjustments` (opening balances, via import) | captain |
+| One-off corrections, bonuses, penalties | `adjustments` (reason required, audited) | captain |
+
+**Editing mid-season:** it depends on what is edited.
+- **Point values** (`points_min/max`) apply to **future** awards only. Points already earned stay as awarded (ADR-4 snapshot). To change them retroactively, the captain uses `adjustments`, which keeps the change visible and audited.
+- **Everything else is recomputed for everyone immediately:** a task's category (its past points move with it), `required`/`active`, `rules` and `tiers`. Every member's tier and the export change at once. The captain edit screen shows how many members' tiers would change before saving, computed from `member_tier`.
+
+**Rules the model does not express yet:** a cap on how many points a track can contribute, points that expire, team-level points, and points moved between fuksis.
+- **Policy:** until then, the captain handles these with `adjustments`.
+- **When to build it:** once a **second** guild needs the same rule, add it as data (e.g. `rules.max_points`) in a new migration. Don't special-case one guild in code.
+
+**Onboarding a new guild:** a platform admin runs `bootstrap_guild(name, slug, captain_email)` once. It is a service-role SQL function, not callable by clients. It creates three things:
+- the guild and its first (current) season,
+- an **unclaimed roster row** `(email = captain_email, role = 'captain', user_id = null)`,
+- an ordinary invite (`max_uses 1`, expires in 7 days).
+
+The admin sends that link to the captain. The existing `join_guild` email-claim path makes only the OTP-verified owner of that email captain; anyone else using the link gets `fuksi`. There are no new invite semantics: invites still never carry a role. pgTAP covers it: a different email joining through the bootstrap invite gets `fuksi`, and no client-created invite can ever produce a captain. The captain then imports their sheet or roadmap, and everything else is self-service.
+
 ---
+## Appendix E: v3.2 (multi-guild)
+- `categories.color` (hex CHECK) and `categories.icon` (enum CHECK) replace the hardcoded 6-slot palette, because a guild with 7 tracks would have broken it. Database proposed the colour CHECK in round 4 and Security the icon enum. The Minimalist's ponytail trigger ("when a 2nd guild needs its own look") is now met.
+- §10 documents how guild-to-guild variation is handled, plus `bootstrap_guild`.
+- Round 7 fixes:
+  - `bootstrap_guild` uses a pre-seeded captain roster row plus a one-use fuksi invite, never a role-carrying invite (Security + Architect).
+  - The mid-season edit wording now separates snapshotted point values from recomputed category/rules/tiers/required (Database).
+  - `import_apply` applies `lower()` to colours before insert (Minimalist + Product + Database).
+
 ## Appendix D: Round-4 resolution log (map-driven)
 | Proposal | Outcome | Decided by |
 |---|---|---|
@@ -182,7 +232,7 @@ Demo (3 min): fuksi opens their map → organizer scans at an event and a node l
 | P3 write-ins | `requires_note`, enforced in RPC; grey pills UI | all |
 | P4 secrets | `revealed_at not null default now()` ('infinity' = hidden); `task_visible()` on tasks+events; submit rejects; locked placeholders via `roadmap()` | Database (NULL bug), Security (3 leaks), Product (visible keyholes), **over** Minimalist's reuse of `active` (secret ≠ retired) |
 | P5 events→nodes | Accepted; **checkins merged into submissions** (`event_id`, partial unique); `award_task()` single owner; `limit_reached` | Database + Minimalist (merge), Architect (B1 single function), Security + Minimalist (`limit_reached`) |
-| P6 roadmap | Stacked category cards on phone, full map on projector, 4 node states; **no color/icon/sort columns** (palette + id order) | Product (UX), Minimalist (no columns) |
+| P6 roadmap | Stacked category cards on phone, full map on projector, 4 node states; no sort columns (id order). Colour/icon columns were **added later in v3.2** (Appendix E) | Product (UX), Minimalist |
 | P7 mandatory | **Reversed** → `tasks.required` | Product + Database (Captain's Quarters 1–2p lets a fuksi skip a mandatory node) |
 | Missed | 0-minimum categories skipped on import; duplicate nodes = `max_repeats`; Sitsit worker/attendee = two events; ECTS no photo; Major's joke = captain reviewer; formula-safe CSV; category snapshot on submissions | Architect, Security, Database, Minimalist |
 

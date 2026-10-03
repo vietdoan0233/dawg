@@ -21,6 +21,13 @@ Guilds print this as a **roadmap**. Data Guild's (DG's) roadmap looks like this:
 
 **The app is this map, digital.** Each node lights up when you complete it.
 
+## Every guild is different, and that's fine
+DG's map is just one example. Other guilds have different tracks, tasks, points, levels and colours. **None of that is code.** It's all rows in the database belonging to that guild and season:
+- The captain imports their own sheet, so the app becomes *their* map.
+- Changing a task's points later only affects **new** points. Already-earned points stay put.
+- Anything the app can't express yet (e.g. "max 10 points from parties") → the captain uses a manual **adjustment** with a reason.
+- **Rule for coders: never write `if guild == 'DG'`.** If two guilds need the same new rule, add it as data for everyone.
+
 ## The picture
 ```
    📱 Fuksi phone        📱 Tutor phone       📱 Organizer phone     🖥️ Projector
