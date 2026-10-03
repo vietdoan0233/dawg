@@ -6,3 +6,5 @@ __pycache__/
 .venv/
 # guild artwork: not ours to publish (SDD §9 Q6)
 fuksi point roadmap for Data Guild.jpg
+next-env.d.ts
+*.tsbuildinfo
