@@ -51,7 +51,9 @@ export async function loadLeaderboard(guildId: number): Promise<LeaderRow[]> {
 const MESSAGES: Record<string, string> = {
   limit_reached: "You have already used every repeat of this node.",
   note_required: "This node needs a note.",
-  photo_required: "This node needs a photo (photo capture arrives in slice 4).",
+  photo_required: "This node needs a photo.",
+  invalid_photo: "That photo could not be attached. Try again.",
+  unauthenticated: "Please log in again.",
   not_found: "This node is not available.",
   forbidden: "You are not allowed to do that.",
   not_pending: "That submission was already reviewed.",

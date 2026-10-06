@@ -11,6 +11,7 @@ const DEMO_USERS = [
   { label: "Fuksi 3 (Group B)", email: "demo.fuksi.3@demo.invalid" },
   { label: "Tutor A", email: "demo.tutor.a@demo.invalid" },
   { label: "Tutor B", email: "demo.tutor.b@demo.invalid" },
+  { label: "Organizer", email: "demo.organizer@demo.invalid" },
   { label: "Captain", email: "demo.captain@demo.invalid" },
 ];
 

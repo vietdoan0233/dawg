@@ -2,8 +2,11 @@
 import Link from "next/link";
 import { DemoSwitcher } from "@/components/DemoSwitcher";
 import { GuildSwitcher } from "@/components/GuildSwitcher";
+import { MyCode } from "@/components/MyCode";
+import { RevealPanel } from "@/components/RevealPanel";
 import { ReviewQueue } from "@/components/ReviewQueue";
 import { RoadmapCards } from "@/components/RoadmapCards";
+import { Scanner } from "@/components/Scanner";
 import { db } from "@/lib/supabase";
 import { useMe } from "@/lib/useMe";
 
@@ -38,9 +41,19 @@ export default function Home() {
         </p>
       )}
       {/* key: remount per member, so switching users never shows the previous member's data */}
-      {me?.role === "fuksi" && <RoadmapCards key={me.memberId} me={me} />}
-      {(me?.role === "tutor" || me?.role === "captain") && <ReviewQueue key={me.memberId} me={me} />}
-      {me?.role === "organizer" && <p>The organizer scanner arrives in slice 3.</p>}
+      {me?.role === "fuksi" && (
+        <div key={me.memberId}>
+          <MyCode guildId={me.guildId} />
+          <RoadmapCards me={me} />
+        </div>
+      )}
+      {me && me.role !== "fuksi" && (
+        <div key={me.memberId} className="staff">
+          {me.role === "captain" && <RevealPanel guildId={me.guildId} />}
+          {me.role !== "organizer" && <ReviewQueue me={me} />}
+          <Scanner guildId={me.guildId} memberId={me.memberId} />
+        </div>
+      )}
     </main>
   );
 }

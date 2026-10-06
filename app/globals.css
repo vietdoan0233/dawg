@@ -80,3 +80,15 @@ button.node { cursor: pointer; }
 .leaders li { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; }
 .leaders .bar { grid-column: 1 / -1; height: 14px; border-radius: 7px; background: var(--accent); transition: width 0.8s ease; min-width: 4px; }
 @media (prefers-reduced-motion: reduce) { .dot, .leaders .bar { transition: none; } }
+
+.grow { flex: 1; }
+.panel, .mycode { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: grid; gap: 10px; justify-items: start; }
+.panel > label, .panel > form { width: 100%; }
+.mycode img { border-radius: 8px; background: #fff; }
+.mycode code { overflow-wrap: anywhere; }
+.staff { display: grid; gap: 4px; }
+.camera { width: 100%; max-height: 50vh; border-radius: 8px; background: #000; }
+.results { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; width: 100%; }
+.results li { padding: 6px 8px; border-radius: 6px; background: var(--bg); }
+.results li.ok { font-weight: 600; }
+.proof { max-width: 100%; max-height: 320px; border-radius: 8px; display: block; margin-top: 6px; }

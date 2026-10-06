@@ -54,6 +54,23 @@ begin
           'PLACEHOLDER demo node: the title, category and 2p are inferred from the docs, not confirmed by Data Guild.',
           2, 2, false);
 
+  -- DEMO PLACEHOLDER nodes for the 3-minute demo (SDD §7), NOT Data Guild's real map: replace them with the
+  -- roadmap data when it arrives. Each one exercises a feature: check-in, photo + range, write-in, keyhole.
+  insert into tasks (guild_id, season_id, category_id, title, description, points_min, points_max,
+                     max_repeats, requires_photo, requires_note, revealed_at)
+  values
+    (g, s, c_mandatory, 'Orientation lecture', 'DEMO PLACEHOLDER: check in at the event.',          2, 2, 1, false, false, now()),
+    (g, s, c_party,     'Sitsit',              'DEMO PLACEHOLDER: check in at the event.',          1, 1, 1, false, false, now()),
+    (g, s, c_guild,     'Guild sauna evening', 'DEMO PLACEHOLDER: photo proof, tutor picks 1-3p.',  1, 3, 1, true,  false, now()),
+    (g, s, c_culture,   'Teekkari song night', 'DEMO PLACEHOLDER: photo proof.',                    2, 2, 1, true,  false, now()),
+    (g, s, c_other,     '+ my own event',      'DEMO PLACEHOLDER: write the event name.',           1, 1, 8, false, true,  now()),
+    (g, s, c_culture,   'Keyhole: the secret', 'DEMO PLACEHOLDER: hidden until the captain reveals it.', 3, 3, 1, false, false, 'infinity');
+
+  -- events run "now" so the demo check-in is inside the +-2 h window whenever the seed runs
+  insert into events (guild_id, season_id, task_id, title, starts_at, ends_at)
+  select g, s, t.id, t.title, now() - interval '1 hour', now() + interval '6 hours'
+    from tasks t where t.guild_id = g and t.title in ('Orientation lecture', 'Sitsit');
+
   -- Demo roster
   insert into tutor_groups (guild_id, season_id, name) values (g, s, 'Group A') returning id into grp_a;
   insert into tutor_groups (guild_id, season_id, name) values (g, s, 'Group B') returning id into grp_b;
@@ -70,7 +87,8 @@ begin
     ('00000000-0000-4000-8000-000000000003'::uuid, 'demo.tutor.b@demo.invalid'),
     ('00000000-0000-4000-8000-000000000004'::uuid, 'demo.fuksi.1@demo.invalid'),
     ('00000000-0000-4000-8000-000000000005'::uuid, 'demo.fuksi.2@demo.invalid'),
-    ('00000000-0000-4000-8000-000000000006'::uuid, 'demo.fuksi.3@demo.invalid')) u(id, email);
+    ('00000000-0000-4000-8000-000000000006'::uuid, 'demo.fuksi.3@demo.invalid'),
+    ('00000000-0000-4000-8000-000000000007'::uuid, 'demo.organizer@demo.invalid')) u(id, email);
 
   insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
   select u.id, u.id, u.id::text, jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
@@ -85,7 +103,8 @@ begin
     ('00000000-0000-4000-8000-000000000003'::uuid, 'demo.tutor.b@demo.invalid',  'Demo Tutor B', 'tutor',   grp_b),
     ('00000000-0000-4000-8000-000000000004'::uuid, 'demo.fuksi.1@demo.invalid',  'Demo Fuksi 1', 'fuksi',   grp_a),
     ('00000000-0000-4000-8000-000000000005'::uuid, 'demo.fuksi.2@demo.invalid',  'Demo Fuksi 2', 'fuksi',   grp_a),
-    ('00000000-0000-4000-8000-000000000006'::uuid, 'demo.fuksi.3@demo.invalid',  'Demo Fuksi 3', 'fuksi',   grp_b)
+    ('00000000-0000-4000-8000-000000000006'::uuid, 'demo.fuksi.3@demo.invalid',  'Demo Fuksi 3', 'fuksi',   grp_b),
+    ('00000000-0000-4000-8000-000000000007'::uuid, 'demo.organizer@demo.invalid', 'Demo Organizer', 'organizer', null)
   ) u(id, email, display_name, role, grp);
 
   insert into member_codes (member_id) select id from members where guild_id = g;

@@ -81,6 +81,8 @@ select throws_ok(format('select public.submit_task(%s, null, ''%s/999/x.jpg'', r
 select throws_ok(format('select public.submit_task(%s, null, ''%s/%s/x.jpg'', ''nothex'')',
                         current_setting('t.photo'), current_setting('t.g'), current_setting('t.f1')), '22023', 'invalid_photo',
                  'a malformed SHA-256 is rejected');
+-- 0002: the photo must really be uploaded first (the fuksi's own folder; proofs_insert allows it)
+insert into storage.objects (bucket_id, name) values ('proofs', current_setting('t.g') || '/' || current_setting('t.f1') || '/x.jpg');
 select lives_ok(format('select public.submit_task(%s, null, ''%s/%s/x.jpg'', repeat(''a'', 64))',
                        current_setting('t.photo'), current_setting('t.g'), current_setting('t.f1')),
                 'a photo under the caller''s folder is accepted');
@@ -92,7 +94,9 @@ select throws_ok($$insert into public.submissions (guild_id, season_id, task_id,
 select is((select count(*) from public.tasks where title = 'Secret'), 0::bigint, 'hidden task title is unreadable');
 select is((select count(*) from public.events where title = 'Secret event'), 0::bigint, 'hidden event is unreadable');
 select is((select count(*) from jsonb_array_elements(public.roadmap(current_setting('t.g')::bigint) -> 'nodes') n
-            where (n ->> 'locked')::boolean and not (n ? 'title') and not (n ? 'points_min')), 1::bigint,
+            where (n ->> 'locked')::boolean and not (n ? 'title') and not (n ? 'points_min')
+              and (n ->> 'category_id')::bigint = (select id from public.categories
+                                                    where name = 'Cat B' and guild_id = current_setting('t.g')::bigint)), 1::bigint,
           'roadmap() shows the hidden node as a locked placeholder without title or points');
 -- Slice 1 is self-submission only: the signature keeps with_member_ids, a non-empty array is refused
 select throws_ok(format('select public.submit_task(%s, null, null, null, array[%s])', current_setting('t.range'), current_setting('t.f3')),

@@ -348,6 +348,9 @@ isOneToOne: false
             "award_task":
 { Args: { "p_event_id": number,"p_member_id": number,"p_points": number,"p_reason": string,"p_reviewer_id": number,"p_source": string,"p_submission_id"?: number,"p_task_id": number }; Returns: string
                            },
+"checkin":
+{ Args: { "p_event_id": number,"p_member_code": string,"p_scanned_at": string }; Returns: string
+                           },
 "current_season":
 { Args: { "p_guild_id": number }; Returns: number
                            },
@@ -365,8 +368,14 @@ isOneToOne: false
               "group_id": number,"group_name": string,"total_points": number
             }[]
                            },
+"my_code":
+{ Args: { "p_guild_id": number }; Returns: string
+                           },
 "my_member_id":
 { Args: { "p_guild_id": number }; Returns: number
+                           },
+"proof_owner":
+{ Args: { "p_name": string }; Returns: (number)[]
                            },
 "required_missing":
 { Args: { "p_member_id": number }; Returns: boolean
@@ -384,6 +393,9 @@ isOneToOne: false
                            },
 "task_visible":
 { Args: { "p_task_id": number }; Returns: boolean
+                           },
+"update_task":
+{ Args: { "p_reveal"?: boolean,"p_task_id": number }; Returns: undefined
                            }
           }
           Enums: {

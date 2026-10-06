@@ -2,6 +2,7 @@ node_modules/
 .next/
 .env*
 !.env.example
+!.env.demo
 __pycache__/
 .venv/
 # guild artwork: not ours to publish (SDD §9 Q6)

@@ -14,15 +14,24 @@ export function RoadmapCards({ me }: { me: Me }) {
   const [open, setOpen] = useState<OpenNode | null>(null);
 
   const refresh = useCallback(() => {
-    loadRoadmap(me.guildId).then(setMap, (e: Error) => setError(e.message));
+    // a failed poll only shows an error while there is no map yet; later polls keep the last good map
+    loadRoadmap(me.guildId).then(
+      (m) => {
+        setMap(m);
+        setError(null);
+      },
+      (e: Error) => setError(e.message),
+    );
   }, [me.guildId]);
 
+  // polls so a check-in, an approval or a reveal shows up without a reload (same 5 s as the projector)
   useEffect(() => {
     refresh();
+    const timer = setInterval(refresh, 5000);
+    return () => clearInterval(timer);
   }, [refresh]);
 
-  if (error) return <p className="error">{error}</p>;
-  if (!map) return <p>Loading your map…</p>;
+  if (!map) return error ? <p className="error">{error}</p> : <p>Loading your map…</p>;
 
   return (
     <>
@@ -48,6 +57,7 @@ export function RoadmapCards({ me }: { me: Me }) {
       })}
       {open && (
         <SubmitSheet
+          me={me}
           node={open}
           onClose={() => setOpen(null)}
           onDone={() => {
