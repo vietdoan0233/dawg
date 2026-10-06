@@ -197,7 +197,7 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+email_sent = 30                # SDD §2: raised auth email limits (OTP for a whole tutor meeting)
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -224,7 +224,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true    # a password sign-up must prove the email before join_guild can use it
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -232,7 +232,7 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+otp_expiry = 600               # 6-digit code: 10 minutes limits guessing
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]
@@ -295,6 +295,25 @@ message_service_sid = ""
 auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 
 # Multi-factor-authentication is available to Supabase Pro plan.
+# SDD §2: sign-in is a 6-digit code, not a link. First sign-in sends "confirmation", later ones "magic_link".
+[auth.email.template.confirmation]
+subject = "Your Fuksipisteet code"
+content_path = "./supabase/templates/otp.html"
+
+[auth.email.template.magic_link]
+subject = "Your Fuksipisteet code"
+content_path = "./supabase/templates/otp.html"
+
+# SDD §2: only @aalto.fi may create an account (0003_auth.sql)
+[auth.hook.before_user_created]
+enabled = true
+uri = "pg-functions://postgres/public/hook_before_user_created"
+
+# no password login for real accounts (pre-hijack); seeded demo users only (0003_auth.sql)
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/hook_custom_access_token"
+
 [auth.mfa]
 # Control how many MFA factors can be enrolled at once per user.
 max_enrolled_factors = 10

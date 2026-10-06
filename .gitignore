@@ -9,3 +9,6 @@ __pycache__/
 fuksi point roadmap for Data Guild.jpg
 next-env.d.ts
 *.tsbuildinfo
+
+# agent git worktrees (each is its own checkout)
+.claude/worktrees/

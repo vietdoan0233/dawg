@@ -348,8 +348,14 @@ isOneToOne: false
             "award_task":
 { Args: { "p_event_id": number,"p_member_id": number,"p_points": number,"p_reason": string,"p_reviewer_id": number,"p_source": string,"p_submission_id"?: number,"p_task_id": number }; Returns: string
                            },
+"bootstrap_guild":
+{ Args: { "p_captain_email": string,"p_name": string,"p_slug": string }; Returns: string
+                           },
 "checkin":
 { Args: { "p_event_id": number,"p_member_code": string,"p_scanned_at": string }; Returns: string
+                           },
+"create_invite":
+{ Args: { "p_days"?: number,"p_guild_id": number,"p_max_uses"?: number }; Returns: string
                            },
 "current_season":
 { Args: { "p_guild_id": number }; Returns: number
@@ -357,15 +363,29 @@ isOneToOne: false
 "has_role":
 { Args: { "p_guild_id": number,"p_roles": (string)[] }; Returns: boolean
                            },
+"hook_before_user_created":
+{ Args: { "event": Json }; Returns: Json
+                           },
+"hook_custom_access_token":
+{ Args: { "event": Json }; Returns: Json
+                           },
 "is_member":
 { Args: { "p_guild_id": number }; Returns: boolean
                            },
 "is_tutor_of":
 { Args: { "p_member_id": number }; Returns: boolean
                            },
+"join_guild":
+{ Args: { "p_code": string }; Returns: number
+                           },
 "leaderboard":
 { Args: { "p_guild_id": number }; Returns: {
               "group_id": number,"group_name": string,"total_points": number
+            }[]
+                           },
+"list_invites":
+{ Args: { "p_guild_id": number }; Returns: {
+              "code": string,"expires_at": string,"max_uses": number,"revoked_at": string,"used_count": number
             }[]
                            },
 "my_code":
@@ -385,8 +405,17 @@ isOneToOne: false
               "result": string,"submission_id": number
             }[]
                            },
+"revoke_invite":
+{ Args: { "p_code": string }; Returns: undefined
+                           },
 "roadmap":
 { Args: { "p_guild_id": number }; Returns: Json
+                           },
+"rotate_my_code":
+{ Args: { "p_guild_id": number }; Returns: string
+                           },
+"set_role":
+{ Args: { "p_member_id": number,"p_role": string,"p_tutor_group_id"?: number }; Returns: undefined
                            },
 "submit_task":
 { Args: { "p_note"?: string,"p_photo_path"?: string,"p_photo_sha256"?: string,"p_task_id": number,"p_with_member_ids"?: (number)[] }; Returns: number

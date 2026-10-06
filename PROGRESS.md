@@ -9,7 +9,7 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 | Slice | What it adds | Status |
 |---|---|---|
 | 1. Walking skeleton | Demo login → fuksi sees their map → submits a task → tutor approves → node lights up → projector shows it | **Done.** Database tests pass. Waiting on PR + review |
-| 2. Auth & hardening | Real email login, invites, roles, more security tests | Not started (demo login is enough for the prototype) |
+| 2. Auth & hardening | Real email login, invites, roles, more security tests | **Built** (branch `slice/2-auth`) |
 | 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype built** |
 | 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype built** |
 | 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal built**; import/export not started |
@@ -57,6 +57,32 @@ Known prototype shortcuts (fix before a real pilot):
 - QR codes never change. A leaked code works all season (needs a "new code" button, `rotate_my_code`).
 - Any tutor can check in any fuksi in the guild, not only their own group. Probably fine; confirm with the team.
 - The check-in time the phone reports is checked but not saved, so a late check-in can't be audited yet.
+
+## Slice 2: real login (branch `slice/2-auth`, built 2026-10-06)
+
+Two modes, one codebase:
+- `npm run dev` = **real app**: log in with your @aalto.fi email + a 6-digit code.
+- `npm run demo` = **pitch demo**: the "Log in as…" switcher with demo users.
+
+What works (tested in a real browser):
+- Log in with a 6-digit email code. Non-@aalto.fi emails are refused, both in the app and by the server.
+- Invite links (`/join/<code>`). Joining always makes you a **fuksi**. If the captain pre-listed your email, you get that row (e.g. captain).
+- The captain makes or revokes invite links and sets anyone's role and tutor group. Nobody can change their own role.
+- "Make a new QR code" for a lost phone. The old code stops working.
+- Onboarding a new guild: a platform admin runs `select bootstrap_guild('Guild name', 'slug', 'captain@aalto.fi');`
+  in the Supabase SQL editor and sends the returned invite link (`/join/<code>`) to the captain.
+- 28 new database tests (191 total, all pass).
+
+Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is really sent).
+
+**Before a real pilot (needs you):**
+- An email provider (e.g. Resend or Postmark) set up as SMTP in the Supabase dashboard, plus raised email rate limits.
+- In the real Supabase project, set up the two auth hooks (Before User Created, Custom Access Token), the code email
+  template (`supabase/templates/otp.html`) and a 10-minute code expiry. Run `supabase config push` or set them in the dashboard;
+  `config.toml` only covers the local copy.
+- Password login is already refused for every real account (a token hook, see `0003_auth.sql`). It closes a real
+  hijack we reproduced: someone password-signs-up the captain's email before the captain's first login.
+- Tutor groups can only be created by the import (slice 5) for now.
 
 ## What you need to do
 

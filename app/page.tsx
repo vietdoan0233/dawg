@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
+import { InvitePanel, RolesPanel } from "@/components/CaptainTools";
 import { DemoSwitcher } from "@/components/DemoSwitcher";
 import { GuildSwitcher } from "@/components/GuildSwitcher";
+import { Login } from "@/components/Login";
 import { MyCode } from "@/components/MyCode";
 import { RevealPanel } from "@/components/RevealPanel";
 import { ReviewQueue } from "@/components/ReviewQueue";
@@ -35,10 +37,16 @@ export default function Home() {
       </header>
 
       {loading && <p>Loading…</p>}
-      {!loading && !me && (
-        <p className={error ? "error" : undefined}>
-          {error ?? (process.env.NEXT_PUBLIC_DEMO === "1" ? "Choose a demo user to start." : "Sign-in arrives in slice 2.")}
-        </p>
+      {!loading && !me && !error && (process.env.NEXT_PUBLIC_DEMO === "1" ? <p>Choose a demo user to start.</p> : <Login />)}
+      {!loading && !me && error && (
+        <div className="panel">
+          <p className="error">{error}</p>
+          {/* logged in, but not (yet) in a guild: joining needs the captain's invite link */}
+          {error.includes("not a member") && <p className="hint">Ask your guild captain for an invite link.</p>}
+          <button type="button" onClick={() => void db().auth.signOut()}>
+            Log out
+          </button>
+        </div>
       )}
       {/* key: remount per member, so switching users never shows the previous member's data */}
       {me?.role === "fuksi" && (
@@ -50,6 +58,8 @@ export default function Home() {
       {me && me.role !== "fuksi" && (
         <div key={me.memberId} className="staff">
           {me.role === "captain" && <RevealPanel guildId={me.guildId} />}
+          {me.role === "captain" && <InvitePanel guildId={me.guildId} />}
+          {me.role === "captain" && <RolesPanel me={me} />}
           {me.role !== "organizer" && <ReviewQueue me={me} />}
           <Scanner guildId={me.guildId} memberId={me.memberId} />
         </div>
