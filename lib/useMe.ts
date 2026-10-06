@@ -36,8 +36,10 @@ export function useMe(wantedGuildId?: number): MeState {
   const [state, setState] = useState<Omit<MeState, "selectGuild">>({ loading: true, me: null, guilds: [], error: null });
 
   useEffect(() => {
+    let latest = 0; // only the newest lookup may set state; older ones that resolve late are dropped
     // subscribing fires INITIAL_SESSION, so this also reloads whenever the chosen guild changes
     const { data } = db().auth.onAuthStateChange((_event, session) => {
+      const run = ++latest;
       if (!session) {
         setState({ loading: false, me: null, guilds: [], error: null });
         return;
@@ -45,12 +47,15 @@ export function useMe(wantedGuildId?: number): MeState {
       // never await supabase calls inside this callback (auth lock); defer them
       setTimeout(() => {
         fetchMe(choice).then(
-          ({ me, guilds }) => setState({ loading: false, me, guilds, error: null }),
-          (e: Error) => setState({ loading: false, me: null, guilds: [], error: e.message }),
+          ({ me, guilds }) => run === latest && setState({ loading: false, me, guilds, error: null }),
+          (e: Error) => run === latest && setState({ loading: false, me: null, guilds: [], error: e.message }),
         );
       }, 0);
     });
-    return () => data.subscription.unsubscribe();
+    return () => {
+      latest = -1;
+      data.subscription.unsubscribe();
+    };
   }, [choice]);
 
   return { ...state, selectGuild: setChoice };

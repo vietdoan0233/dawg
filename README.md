@@ -29,7 +29,7 @@ Both tools need Node on PATH.
 
 ## Slice 1 status (walking skeleton)
 
-Run: `cp .env.example .env.local`, `supabase start` (paste the printed URL + anon key into `.env.local`), `supabase db reset`, `npm install`, `npm run dev`. Open `/`, pick a demo user in "Log in as" (fuksi → map and submit, tutor/captain → approve queue), and open `/board/<guild id>` for the projector. `npm run gen:types` regenerates `types/database.ts`.
+Run: `cp .env.example .env.local`, `supabase start` (paste the printed URL + anon key into `.env.local`, and uncomment `NEXT_PUBLIC_DEMO=1` for the demo login), `supabase db reset`, `npm install`, `npm run dev`. Open `/`, pick a demo user in "Log in as" (fuksi → map and submit, tutor/captain → approve queue), and open `/board/<guild id>` for the projector. `npm run gen:types` regenerates `types/database.ts`.
 
 **Every guild is data.** The schema, RPCs, screens and pgTAP tests never name a guild, category, level or rule: they read rows scoped by `(guild_id, season_id)`, so any guild's map renders the same way, and a person in several guilds picks one in the header. `supabase/seed.sql` is only an *optional demo dataset*: Data Guild (DG) plus six demo users with a known password. It refuses to run on a database that already holds data, so use it on local/demo projects only. Category colour and icon live on `categories` (SDD v3.2); the screens render the stored values.
 

@@ -37,8 +37,9 @@ export default function Home() {
           {error ?? (process.env.NEXT_PUBLIC_DEMO === "1" ? "Choose a demo user to start." : "Sign-in arrives in slice 2.")}
         </p>
       )}
-      {me?.role === "fuksi" && <RoadmapCards me={me} />}
-      {(me?.role === "tutor" || me?.role === "captain") && <ReviewQueue me={me} />}
+      {/* key: remount per member, so switching users never shows the previous member's data */}
+      {me?.role === "fuksi" && <RoadmapCards key={me.memberId} me={me} />}
+      {(me?.role === "tutor" || me?.role === "captain") && <ReviewQueue key={me.memberId} me={me} />}
       {me?.role === "organizer" && <p>The organizer scanner arrives in slice 3.</p>}
     </main>
   );

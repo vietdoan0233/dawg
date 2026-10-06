@@ -1,69 +1,54 @@
-# Fuksipisteet implementation progress
+# Fuksipisteet progress
 
-Updated: 2026-10-03
+Updated: 2026-10-06
 
-## Current snapshot
+## The plan in one picture
 
-- Working branch: `slice/1-walking-skeleton`.
-- Base: `cc0d3d1` — SDD v3.2 and multi-guild architecture update from `origin/main`.
-- Slice 1 implementation is still local and uncommitted. The branch currently points at the base commit; most implementation files are untracked, with `README.md` and `.gitignore` modified.
-- This is a demo walking skeleton, not a complete or production-ready Data Guild rollout.
+The app is built in 5 steps called **slices**. Each slice is a small working piece (SDD §7):
 
-## Implemented
+| Slice | What it adds | Status |
+|---|---|---|
+| 1. Walking skeleton | Demo login → fuksi sees their map → submits a task → tutor approves → node lights up → projector shows it | **Built, reviewed, waiting on a real database test** |
+| 2. Auth & hardening | Real email login, invites, roles, more security tests | Not started |
+| 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | Not started |
+| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | Not started |
+| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | Not started |
 
-- Next.js app with demo-user login, member/guild selection, fuksi roadmap, tutor/captain review queue, and projector map with a tutor-group leaderboard.
-- Supabase migration `0001_init.sql` with the v3 schema, RLS and explicit grants, security-definer RPCs, progress/tier views, and `award_task` as the points-awarding path.
-- Category colour and icon stored in each category row and rendered by the app, as required by SDD v3.2.
-- Optional demo seed guarded against non-empty databases. It contains six categories, four tiers, category rules, six demo members, and one explicitly labelled placeholder task.
-- Multi-guild selection and tests using two guilds with different track structures.
-- Five SQL test files: privileges, award flow, app flow, category appearance, and multi-guild isolation.
-- `submit_task` keeps the `with_member_ids` parameter for compatibility but rejects non-empty values with `group_submit_unsupported`.
-- `bootstrap_guild` is assigned in the README to Slice 2 / Lane A; it is not implemented in Slice 1.
+## Where we are (slice 1)
 
-## Architecture status
+Branch `slice/1-walking-skeleton`.
 
-The implementation follows the main v3.2 architecture: guild and season scoped data, composite relationships, database RPCs for writes, RLS, data-driven category appearance, and no guild-specific logic in the app or schema.
+**Done**
+- App pages: fuksi map, tutor/captain review queue, projector board with leaderboard.
+- Database: all tables, security rules, and the one function allowed to give points (`award_task`).
+- Supports several guilds with different rules (rules are data, not code).
+- 5 database test files, written but not yet run for real (see below).
+- Reviewed by 3 agents (database, security, code) on 2026-10-06. No critical issues. Fixed:
+  - switching demo users showed the previous user's map or queue
+  - deleting a task would have erased the points people earned from it
+  - missing index for the tutor check
+  - an old login lookup could overwrite a newer one
+  - demo login was on by default in `.env.example`
 
-There are limited, explicit deviations or deferrals; this is not a general architecture pivot:
+**Not done yet: needed to finish slice 1**
+1. **Run the database tests for real.** Needs Docker + Supabase CLI: `supabase start`, `supabase db reset`, `supabase test db`. Nobody on the team has run this yet.
+2. **Get the real Data Guild roadmap** (the image or a list of nodes with category, points, repeats, who reviews, photo yes/no, secret yes/no). The seed only has one placeholder task for now.
+3. **Open a PR to `main`** and get a teammate's review, then merge.
 
-- **Group submission:** the SDD still describes `with_member_ids` behavior, but Slice 1 rejects group submissions. `submitted_by`, consent handling, and skip-at-limit behavior are deferred. Record and debate this deferral in the SDD before treating it as an accepted long-term contract.
-- **Demo data:** the only task is an inferred “Work at Sitsit” 2-point Work node. Its title, category, points, and `requires_photo = false` are placeholders, not confirmed DG policy. Season dates are placeholders too. The actual roadmap image/data is absent.
-- **Tier rules:** the demo category minimums have `tier_id = null`, so they apply to every tier. Whether higher tiers need additional category minimums remains open (SDD §9 Q3).
-- **Projector:** it currently shows the logged-in member’s roadmap state. Confirm whether that is intended for a shared projector or if it should show a guild-wide view.
-- **Guild onboarding:** `bootstrap_guild` is scheduled in the README for Slice 2 / Lane A, while SDD §10 describes its behavior. Confirm the schedule before that slice begins.
+## What you need to do
 
-## Inputs still needed
+- [ ] Install Docker Desktop + Supabase CLI, then run the 3 commands above. Report anything that fails.
+- [ ] Ask Data Guild for the roadmap data and the open questions in SDD §9 (mandatory nodes, is 40p required, secret node rules, jäynä points, can we use their artwork).
+- [ ] Decide two small things with the team:
+  - Projector: show one member's map (current) or the whole guild?
+  - Group submissions (submitting for several people at once): the spec has them, slice 1 turns them off. Keep off until later?
+- [ ] After that: open the PR, merge, start slice 2.
 
-For the real DG seed, provide the roadmap image or a node-by-node data source with category, title, points/range, repeat limit, required/reviewer settings, photo/note requirements, and secret status. Also confirm:
+## Known gaps, to fix in later slices
 
-- Actual season start/end dates and the Sitsit event time.
-- Whether “Work at Sitsit” is the 2-point Work node.
-- SDD §9 questions: mandatory-task semantics, whether 40 points is required for the cap, higher-tier category minimums, secret-node reveal rules, jäynä reviewer/point ceiling, and permission to reproduce the roadmap artwork.
-- Whether the projector should show an individual member’s states or a guild-wide view.
-
-## Verification
-
-Checks rerun for this status report:
-
-- `npm run lint` — passed.
-- `npm run build` — passed. The sandbox initially blocked the TypeScript worker (`spawn EPERM`); the successful rerun completed TypeScript checking and generated the app routes.
-- Source scan of `app/`, `components/`, and `lib/` — no service-role key reference found.
-
-Claude also reported:
-
-- Generated Supabase types match the scratch schema.
-- 136 SQL assertions pass against scratch Postgres 18 using a pgTAP shim.
-- API, UI, multi-guild, secret-node, and seed-guard checks pass using local stand-ins.
-
-Still unverified on the real stack: `supabase db reset`, real pgTAP, real GoTrue login, and the actual Supabase default-privilege environment. Docker is unavailable in this workspace, so those checks could not be run here. The API smoke tests used a proxy in place of GoTrue; the pgTAP checks used a shim.
-
-## Push readiness and next steps
-
-**Not ready to push as a completed Slice 1.** The implementation is uncommitted, the real DG map is missing, and the repository’s required Supabase reset/pgTAP verification has not run on the actual stack. Before a public push, the repo guidance also calls for Ponytail/code review before commit and an open-source sanitizer before push; the Claude report does not include results for those reviews.
-
-Recommended order:
-
-1. Keep the current seed explicitly demo-only; obtain the real roadmap and policy answers before claiming DG data is complete.
-2. Decide and document the group-submission deferral and projector behavior. Use the five architecture debaters before changing the SDD or RPC contract.
-3. Run `supabase db reset` and real pgTAP on a Docker-enabled Supabase environment, then verify login against real GoTrue and Supabase privileges.
-4. Complete the required migration/code reviews and open-source sanitizer, then commit and push the slice branch.
+- Some tables (`member_codes`, `invites`, `ai_usage`) don't carry `guild_id` + `season_id`. Fix it or write the exception in the SDD.
+- `supabase/config.toml` allows open email+password sign-up. Lock it down in slice 2.
+- No test yet for two people submitting at the same moment.
+- A rejected task can be resubmitted without limit. Decide if that's OK.
+- Duplicate-photo check trusts the hash the phone sends; slice 4 must compute it on the server.
+- The rank view gets slow at a few hundred members; fine for the demo.

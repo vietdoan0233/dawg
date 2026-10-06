@@ -60,6 +60,7 @@ create table members (
   unique (guild_id, season_id, user_id),
   unique (guild_id, season_id, id));
 create index on members (user_id, guild_id, season_id);
+create index on members (guild_id, season_id, tutor_group_id); -- is_tutor_of runs per row in RLS
 
 create table member_codes (                                     -- no grants: only via RPCs
   member_id bigint primary key references members on delete cascade,
@@ -132,7 +133,7 @@ create table submissions (
   reviewed_by bigint, reviewed_at timestamptz,                  -- check-in: scanner + scanned_at
   created_at timestamptz not null default now(),                -- check-in: synced_at
   foreign key (guild_id, season_id, task_id, category_id) references tasks (guild_id, season_id, id, category_id)
-    on update cascade on delete cascade,                         -- recategorising a task moves its points too
+    on update cascade,                                           -- recategorising a task moves its points too; deleting a task with submissions fails (retire it with `active`)
   foreign key (guild_id, season_id, member_id)   references members    (guild_id, season_id, id) on delete cascade,
   foreign key (guild_id, season_id, event_id)    references events     (guild_id, season_id, id),  -- no action: deleting an event never erases approved points
   foreign key (guild_id, season_id, reviewed_by) references members    (guild_id, season_id, id) on delete set null (reviewed_by),
