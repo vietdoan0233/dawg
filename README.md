@@ -6,6 +6,24 @@ Guilds track fuksi points (tasks + events → teekkari cap at Wappu) in messy Go
 - **Full spec:** [`docs/fuksipisteet/SDD.md`](docs/fuksipisteet/SDD.md), the schema, security and build slices (agreed by a 5-agent architecture review)
 - **Agent rules:** [`AGENTS.md`](AGENTS.md)
 
+## Run it locally
+
+**Not a developer?** Follow the step-by-step guide: [`docs/HOW-TO-RUN.md`](docs/HOW-TO-RUN.md).
+
+Needs Git, Node 22+ and Docker Desktop (running).
+
+```bash
+git clone <this repo> && cd <repo folder>
+npm install
+cp .env.example .env.local
+npx supabase start      # first run downloads Docker images; prints the API URL and anon key
+                        # paste both into .env.local
+npx supabase db reset   # builds the schema and loads the Data Guild demo data
+npm run demo            # or `npm run dev` for real email login only
+```
+
+Open http://localhost:3000 and pick a demo user under "Choose your character". Email login codes are not really sent: read them at http://127.0.0.1:54324. Stop the database with `npx supabase stop`.
+
 ## Team setup
 
 **Claude Code**
@@ -29,7 +47,7 @@ Both tools need Node on PATH.
 
 ## Slice 1 status (walking skeleton)
 
-Run: `cp .env.example .env.local`, `supabase start` (paste the printed URL + anon key into `.env.local`, and uncomment `NEXT_PUBLIC_DEMO=1` for the demo login), `supabase db reset`, `npm install`, `npm run dev`. Open `/`, pick a demo user under "Choose your character" (fuksi → skill tree and submit, tutor/captain → review queue, organizer → check-in), and open `/board/<guild id>` for the projector. `npm run gen:types` regenerates `types/database.ts`.
+Run it as in [Run it locally](#run-it-locally). Open `/`, pick a demo user under "Choose your character" (fuksi → skill tree and submit, tutor/captain → review queue, organizer → check-in), and open `/board/<guild id>` for the projector. `npm run gen:types` regenerates `types/database.ts`.
 
 **Every guild is data.** The schema, RPCs, screens and pgTAP tests never name a guild, category, level or rule: they read rows scoped by `(guild_id, season_id)`, so any guild's map renders the same way, and a person in several guilds picks one in the header. `supabase/seed.sql` is only an *optional demo dataset*: Data Guild (DG) plus six demo users with a known password. It refuses to run on a database that already holds data, so use it on local/demo projects only. Category colour and icon live on `categories` (SDD v3.2); the screens render the stored values.
 
