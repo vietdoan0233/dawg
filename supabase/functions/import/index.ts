@@ -1,14 +1,12 @@
 import { Anthropic } from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const client = new Anthropic();
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL") || "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-);
+const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
 interface ColumnMapping {
-  [key: string]: string; // CSV header -> target field
+  [key: string]: string;
 }
 
 interface ImportRequest {
@@ -25,7 +23,75 @@ interface ImportResponse {
   message?: string;
 }
 
-// Helper to safely mask PII (names, emails, photos, roster values)
+// Parse JWT and extract user info
+async function verifyToken(
+  token: string,
+  supabase: SupabaseClient
+): Promise<{ user_id: string; email: string } | null> {
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) {
+      return null;
+    }
+    return {
+      user_id: data.user.id,
+      email: data.user.email || "",
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Check if user is captain of the guild in current season
+async function isCaptain(
+  supabase: SupabaseClient,
+  guild_id: number,
+  user_id: string
+): Promise<boolean> {
+  try {
+    const { data: member, error } = await supabase
+      .from("members")
+      .select("role")
+      .eq("guild_id", guild_id)
+      .eq("user_id", user_id)
+      .single();
+
+    return !error && member?.role === "captain";
+  } catch {
+    return false;
+  }
+}
+
+// CSV parsing with proper quoted-field handling
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    const nextChar = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        current += '"';
+        i++; // Skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === "," && !inQuotes) {
+      result.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current.trim());
+  return result;
+}
+
+// Mask PII in samples
 function maskSample(
   value: unknown,
   columnName: string
@@ -34,7 +100,6 @@ function maskSample(
   const str = String(value);
   const lowerCol = columnName.toLowerCase();
 
-  // Never expose names, emails, photos, or raw roster values
   if (
     lowerCol.includes("email") ||
     lowerCol.includes("name") ||
@@ -45,7 +110,6 @@ function maskSample(
     return `[${str.length} chars]`;
   }
 
-  // Numbers and other fields: keep shape but mask content
   if (typeof value === "number") return 0;
   if (typeof value === "boolean") return false;
   return `[${str.length} chars]`;
@@ -58,11 +122,11 @@ function parseCSVPreview(
   const lines = content.split("\n").filter((l) => l.trim());
   if (lines.length === 0) throw new Error("Empty CSV");
 
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = parseCSVLine(lines[0]);
   const samples: Record<string, unknown>[] = [];
 
   for (let i = 1; i < Math.min(lines.length, 4); i++) {
-    const values = lines[i].split(",").map((v) => v.trim());
+    const values = parseCSVLine(lines[i]);
     const sample: Record<string, unknown> = {};
     for (let j = 0; j < headers.length; j++) {
       sample[headers[j]] = maskSample(values[j] || "", headers[j]);
@@ -73,7 +137,7 @@ function parseCSVPreview(
   return { headers, samples };
 }
 
-// Call Claude to map CSV columns to import fields
+// Get column mapping from Claude
 async function getColumnMapping(
   headers: string[],
   samples: Record<string, unknown>[]
@@ -119,7 +183,7 @@ Return ONLY valid JSON, no explanation.`;
   }
 }
 
-// Parse CSV rows based on column mapping
+// Parse CSV rows with proper quoted-field handling
 function parseCSVRows(
   content: string,
   mapping: ColumnMapping
@@ -127,18 +191,43 @@ function parseCSVRows(
   const lines = content.split("\n").filter((l) => l.trim());
   if (lines.length === 0) return [];
 
-  const headers = lines[0].split(",").map((h) => h.trim());
+  const headers = parseCSVLine(lines[0]);
   const rows: Record<string, unknown>[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(",").map((v) => v.trim());
+    const values = parseCSVLine(lines[i]);
     const row: Record<string, unknown> = {};
 
     for (let j = 0; j < headers.length; j++) {
       const csvHeader = headers[j];
       const targetField = mapping[csvHeader];
       if (targetField && values[j]) {
-        row[targetField] = values[j];
+        // Type conversion for numeric fields
+        if (
+          targetField === "points_min" ||
+          targetField === "points_max" ||
+          targetField === "max_repeats" ||
+          targetField === "min_total" ||
+          targetField === "points" ||
+          targetField === "min_points"
+        ) {
+          const num = parseInt(values[j], 10);
+          if (!isNaN(num)) {
+            row[targetField] = num;
+          }
+        } else if (
+          targetField === "required" ||
+          targetField === "requires_photo" ||
+          targetField === "requires_note" ||
+          targetField === "active"
+        ) {
+          row[targetField] =
+            values[j].toLowerCase() === "true" ||
+            values[j].toLowerCase() === "yes" ||
+            values[j] === "1";
+        } else {
+          row[targetField] = values[j];
+        }
       }
     }
 
@@ -150,7 +239,7 @@ function parseCSVRows(
   return rows;
 }
 
-// Organize rows by type (categories, tasks, tiers, rules, members, adjustments)
+// Organize rows by type
 function organizeData(rows: Record<string, unknown>[]) {
   const categories: Record<string, unknown>[] = [];
   const tasks: Record<string, unknown>[] = [];
@@ -169,9 +258,9 @@ function organizeData(rows: Record<string, unknown>[]) {
       rules.push(row);
     } else if (row.email && row.display_name && (row.role || row.tutor_group_name)) {
       members.push(row);
-    } else if (row.email && row.category_name && row.points && row.reason) {
+    } else if (row.email && row.category_name && typeof row.points === "number") {
       adjustments.push(row);
-    } else if (row.category_name && row.color) {
+    } else if (row.category_name && (row.color || row.icon)) {
       categories.push(row);
     }
   }
@@ -182,25 +271,75 @@ function organizeData(rows: Record<string, unknown>[]) {
 export async function POST(req: Request): Promise<Response> {
   const authHeader = req.headers.get("authorization");
 
-  // Verify authenticated user token
-  if (!authHeader || !authHeader.includes("Bearer ")) {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return new Response(
-      JSON.stringify({ status: "error", message: "Unauthorized" }),
+      JSON.stringify({
+        status: "error",
+        message: "Missing or invalid Authorization header",
+      }),
       { status: 401, headers: { "Content-Type": "application/json" } }
     );
   }
 
   try {
+    const token = authHeader.slice(7); // Remove "Bearer " prefix
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Verify JWT token
+    const user = await verifyToken(token, supabase);
+    if (!user) {
+      return new Response(
+        JSON.stringify({
+          status: "error",
+          message: "Invalid or expired token",
+        }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     const body = (await req.json()) as ImportRequest;
+    const { guild_id, csv_content, mapping, confirm } = body;
+
+    // Verify captain role
+    const isCaptainUser = await isCaptain(supabase, guild_id, user.user_id);
+    if (!isCaptainUser) {
+      return new Response(
+        JSON.stringify({
+          status: "error",
+          message: "Only guild captains can import data",
+        }),
+        { status: 403, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     // Step 1: Generate mapping preview
-    if (!body.mapping) {
-      const { headers, samples } = parseCSVPreview(body.csv_content);
-      const mapping = await getColumnMapping(headers, samples);
+    if (!mapping || !confirm) {
+      if (!csv_content) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: "Missing csv_content",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const { headers, samples } = parseCSVPreview(csv_content);
+      if (headers.length === 0) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: "CSV has no headers",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const generatedMapping = await getColumnMapping(headers, samples);
 
       return new Response(
         JSON.stringify({
-          mapping,
+          mapping: generatedMapping,
           preview: samples,
           status: "success",
         } as ImportResponse),
@@ -212,14 +351,34 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     // Step 2: Apply import with confirmed mapping
-    if (body.confirm && body.mapping) {
-      const rows = parseCSVRows(body.csv_content, body.mapping);
+    if (confirm && mapping) {
+      if (!csv_content) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: "Missing csv_content",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      const rows = parseCSVRows(csv_content, mapping);
+      if (rows.length === 0) {
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: "CSV has no data rows",
+          }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
       const { categories, tasks, tiers, rules, members, adjustments } =
         organizeData(rows);
 
-      // Call import_apply RPC
+      // Call import_apply RPC with authenticated user context
       const { data, error } = await supabase.rpc("import_apply", {
-        p_guild_id: body.guild_id,
+        p_guild_id: guild_id,
         p_categories: categories,
         p_tasks: tasks,
         p_tiers: tiers,
@@ -229,13 +388,23 @@ export async function POST(req: Request): Promise<Response> {
       });
 
       if (error) {
-        throw new Error(`Import failed: ${error.message}`);
+        return new Response(
+          JSON.stringify({
+            status: "error",
+            message: `Import failed: ${error.message}`,
+          }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
       }
 
       return new Response(
         JSON.stringify({
           status: "success",
-          message: `Import successful: ${JSON.stringify(data)}`,
+          message: `Import successful`,
+          data,
         } as ImportResponse),
         {
           status: 200,
@@ -244,7 +413,13 @@ export async function POST(req: Request): Promise<Response> {
       );
     }
 
-    throw new Error("Invalid request: missing mapping or confirm flag");
+    return new Response(
+      JSON.stringify({
+        status: "error",
+        message: "Invalid request: missing mapping or confirm flag",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
 

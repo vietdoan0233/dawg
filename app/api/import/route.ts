@@ -1,14 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 
+interface ImportRequestBody {
+  guild_id: number;
+  csv_content: string;
+  mapping?: Record<string, string>;
+  confirm?: boolean;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { guild_id, csv_content } = body as {
-      guild_id: number;
-      csv_content: string;
-    };
+    // Extract and verify bearer token from the request
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message: "Missing or invalid Authorization header",
+        },
+        { status: 401 }
+      );
+    }
 
-    // Call the Supabase Edge Function
+    const body = await request.json() as ImportRequestBody;
+    const { guild_id, csv_content, mapping, confirm } = body;
+
+    // Validate required fields
+    if (!guild_id || !csv_content) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message: "Missing required fields: guild_id and csv_content",
+        },
+        { status: 400 }
+      );
+    }
+
+    // Call the Supabase Edge Function, passing the entire body and auth header
     const functionUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
       ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/import`
       : "";
@@ -17,9 +44,9 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${request.headers.get("Authorization")?.split(" ")[1] || ""}`,
+        Authorization: authHeader,
       },
-      body: JSON.stringify({ guild_id, csv_content }),
+      body: JSON.stringify({ guild_id, csv_content, mapping, confirm }),
     });
 
     const result = await response.json();

@@ -12,7 +12,7 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 | 2. Auth & hardening | Real email login, invites, roles, more security tests | **Done**, in `main`. Needs production email + auth hooks before a pilot |
 | 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype**, in `main`. See shortcuts below |
 | 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype**, in `main`. No 30-day purge, the server doesn't compute the photo hash |
-| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal done**, **UI polish done**. Import/export **in progress** (migration 0004, Edge Functions, captain UI scaffolding added) |
+| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal done**, **UI polish done**. Import/export **fixes in progress** (migration 0005 adds auth, case-insensitive matching, duplicate prevention, proper CSV parsing, role restrictions, formula-safe export) |
 | UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
 **Next up:** slice 5 import/export, then hardening the slice 3–4 prototypes (see the shortcut list).
@@ -103,6 +103,40 @@ Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is
   buttons off-screen); staff tabs scrolled sideways (Secrets/People/Projector hidden) and now fit as icon + label;
   welcome cards show two per row. Desktop unchanged. CSS only (`app/globals.css`).
 
+## Slice 5: import/export fixes (in progress)
+
+**Working on: fix import/export security and functionality (2026-10-07)**
+
+Branch: `slice/5-import-export-fixes` (from `origin/main` commit 701d803).
+
+Fixed issues:
+1. **Authentication & authorization**: API routes now validate Bearer tokens and pass them to Edge Functions; Edge Functions verify JWT and check captain role before processing.
+2. **Import confirmation end-to-end**: Mapping and confirm fields preserved through API route → Edge Function → RPC flow.
+3. **Export data accuracy**: Now calls the `progress` view to return actual per-category points and calls `member_tier` for each member's tier (not hardcoded zeros).
+4. **Duplicate import prevention**: New `import_history` table tracks successful imports by guild+season; repeat imports rejected with `import_already_applied` error.
+5. **CSV parsing**: Proper quoted-field handling, type conversion for numeric fields, boolean parsing for flags.
+6. **Case-insensitive matching**: Categories and tiers matched by `lower(name)` in import_apply; allows "TestCategory" CSV column to match "testcategory" imported data.
+7. **Role restrictions**: Imported members always assigned 'fuksi' role; staff roles must use `set_role` RPC to prevent privilege escalation.
+8. **Formula-safe export**: Category names and data cells in CSV escaped with leading `'` if they start with `=`, `+`, `-`, `@`, tab, or carriage return.
+
+Added:
+- Migration `0005_import_fixes.sql`: Rewrites `import_apply` with all fixes, adds `import_history` table and index.
+- Test file `08_import_fixes.test.sql`: 18 pgTAP tests covering import auth, duplicate prevention, case-insensitive matching, role assignment, member/adjustment mapping, formula escaping.
+- Updated `app/api/import/route.ts` and `app/api/export/route.ts`: Bearer token validation, full request body forwarding.
+- Rewritten `supabase/functions/import/index.ts`: JWT verification, captain check, proper CSV parsing, organized data structure.
+- Rewritten `supabase/functions/export/index.ts`: JWT verification, captain check, progress/member_tier view queries, escaped CSV output.
+- Updated `tsconfig.json`: Excluded `supabase/functions` from Next.js TypeScript checking (Deno/SDK conflicts).
+
+Build status:
+- `npm run lint`: ✓ Pass
+- `npm run build`: ✓ Pass
+- `supabase db reset`: Requires Docker (not available in this environment; tests ready to run when Docker is available)
+
+**Pending:**
+- Lane A migration review of 0005_import_fixes.sql (role restriction, duplicate prevention, case-insensitive matching).
+- Teammate agent review before merge to `main`.
+- Test execution once Docker/local Supabase is available.
+
 ## What you need to do
 
 - [x] Docker + Supabase running locally; all database tests pass.
@@ -113,7 +147,7 @@ Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is
 - [x] Merge everything into `main` and delete the merged branches.
 - [ ] Get a teammate's review of what's in `main` (it skipped PRs).
 - [ ] Set up production email + auth hooks (see "Before a real pilot" above).
-- [ ] Start slice 5 import/export.
+- [ ] **Slice 5 import/export**: Lane A review of migration 0005, then teammate agent review, then test with Docker and merge.
 
 ## Known gaps, to fix in later slices
 
