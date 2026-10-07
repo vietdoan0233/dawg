@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from "react";
 import { db } from "@/lib/supabase";
 import { friendly } from "@/lib/roadmap";
 import type { Me } from "@/lib/useMe";
+import { chime } from "@/lib/fx";
+import { Icon } from "./Icon";
 
 type Item = { id: number; who: string; title: string; note: string | null; photo: string | null; min: number; max: number };
 
@@ -53,7 +55,13 @@ export function ReviewQueue({ me }: { me: Me }) {
 
   if (error) return <p className="error">{error}</p>;
   if (!items) return <p>Loading the queue…</p>;
-  if (items.length === 0) return <p>Nothing waiting for review.</p>;
+  if (items.length === 0)
+    return (
+      <div className="empty-state">
+        <Icon name="inbox" size={40} />
+        <p>Nothing waiting for review. Nice work!</p>
+      </div>
+    );
 
   // "Approve all" = each node's points_min (SDD §4); one bad row rolls the whole batch back
   const approveAll = async () => {
@@ -73,7 +81,7 @@ export function ReviewQueue({ me }: { me: Me }) {
       <div className="row">
         <h2 className="grow">Waiting for review ({items.length})</h2>
         <button type="button" disabled={busy} onClick={() => void approveAll()}>
-          ✅ Approve all (min points)
+          <Icon name="check" /> Approve all (min points)
         </button>
       </div>
       {notice && <p className="error">{notice}</p>}
@@ -104,6 +112,7 @@ function QueueRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
     setBusy(false);
     if (error) return setError(friendly(error.message));
     if (data[0]?.result === "limit_reached") return setError(friendly("limit_reached"));
+    if (approve) chime("lit");
     onChanged();
   };
 
@@ -129,10 +138,10 @@ function QueueRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button type="button" disabled={busy} onClick={() => void review(false)}>
-          ❌ Reject
+          <Icon name="x" /> Reject
         </button>
         <button type="button" className="primary" disabled={busy} onClick={() => void review(true)}>
-          ✅ Approve {points}p
+          <Icon name="check" /> Approve {points}p
         </button>
       </div>
     </li>

@@ -1,69 +1,56 @@
 "use client";
-import Link from "next/link";
-import { InvitePanel, RolesPanel } from "@/components/CaptainTools";
 import { DemoSwitcher } from "@/components/DemoSwitcher";
-import { GuildSwitcher } from "@/components/GuildSwitcher";
+import { FuksiHome } from "@/components/FuksiHome";
+import { Icon } from "@/components/Icon";
 import { Login } from "@/components/Login";
-import { MyCode } from "@/components/MyCode";
-import { RevealPanel } from "@/components/RevealPanel";
-import { ReviewQueue } from "@/components/ReviewQueue";
-import { RoadmapCards } from "@/components/RoadmapCards";
-import { Scanner } from "@/components/Scanner";
+import { StaffHome } from "@/components/StaffHome";
+import { TopBar } from "@/components/TopBar";
 import { db } from "@/lib/supabase";
 import { useMe } from "@/lib/useMe";
 
 export default function Home() {
   const { loading, me, guilds, error, selectGuild } = useMe();
 
-  return (
-    <main>
-      <header className="top">
-        <h1>Fuksipisteet</h1>
-        {me && (
-          <p className="who">
-            {me.name} · {me.role} · {me.guildName}
-          </p>
-        )}
-        <DemoSwitcher current={me?.name} />
-        {me && <GuildSwitcher guilds={guilds} current={me.guildId} onSelect={selectGuild} />}
-        {me && (
-          <div className="row">
-            <Link href={`/board/${me.guildId}`}>Projector</Link>
-            <button type="button" onClick={() => void db().auth.signOut()}>
-              Log out
-            </button>
-          </div>
-        )}
-      </header>
+  if (loading) {
+    return (
+      <div className="screen">
+        <div className="center-msg">
+          <p className="loading-rune">Loading…</p>
+        </div>
+      </div>
+    );
+  }
 
-      {loading && <p>Loading…</p>}
-      {!loading && !me && !error && (process.env.NEXT_PUBLIC_DEMO === "1" ? <p>Choose a demo user to start.</p> : <Login />)}
-      {!loading && !me && error && (
-        <div className="panel">
-          <p className="error">{error}</p>
-          {/* logged in, but not (yet) in a guild: joining needs the captain's invite link */}
-          {error.includes("not a member") && <p className="hint">Ask your guild captain for an invite link.</p>}
-          <button type="button" onClick={() => void db().auth.signOut()}>
-            Log out
-          </button>
-        </div>
-      )}
-      {/* key: remount per member, so switching users never shows the previous member's data */}
-      {me?.role === "fuksi" && (
-        <div key={me.memberId}>
-          <MyCode guildId={me.guildId} />
-          <RoadmapCards me={me} />
-        </div>
-      )}
-      {me && me.role !== "fuksi" && (
-        <div key={me.memberId} className="staff">
-          {me.role === "captain" && <RevealPanel guildId={me.guildId} />}
-          {me.role === "captain" && <InvitePanel guildId={me.guildId} />}
-          {me.role === "captain" && <RolesPanel me={me} />}
-          {me.role !== "organizer" && <ReviewQueue me={me} />}
-          <Scanner guildId={me.guildId} memberId={me.memberId} />
-        </div>
-      )}
-    </main>
-  );
+  if (!me) {
+    return (
+      <div className="screen welcome">
+        <TopBar me={null} />
+        <main className="welcome-main">
+          <div className="hero">
+            <Icon name="crown" size={44} />
+            <h1>Fuksipisteet</h1>
+            <p>Your fuksi year as a skill tree. Go to events, light up nodes, climb to Teekkari.</p>
+          </div>
+          {error ? (
+            <div className="panel">
+              <p className="error">{error}</p>
+              {/* logged in, but not (yet) in a guild: joining needs the captain's invite link */}
+              {error.includes("not a member") && <p className="hint">Ask your guild captain for an invite link.</p>}
+              <button type="button" onClick={() => void db().auth.signOut()}>
+                Log out
+              </button>
+            </div>
+          ) : process.env.NEXT_PUBLIC_DEMO === "1" ? (
+            <DemoSwitcher />
+          ) : (
+            <Login />
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  const bar = <TopBar me={me} guilds={guilds} onGuild={selectGuild} />;
+  // key: remount per member, so switching users never shows the previous member's data
+  return me.role === "fuksi" ? <FuksiHome key={me.memberId} me={me} bar={bar} /> : <StaffHome key={me.memberId} me={me} bar={bar} />;
 }

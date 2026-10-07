@@ -1,213 +1,422 @@
+/* Fuksipisteet: dark-fantasy theme after the Data Guild roadmap poster (ink-black field, engraved titles,
+   parchment text, gold for progress, purple for secrets). Category colours come from the database (--c). */
 :root {
-  --bg: #f8fafc;
-  --fg: #0f172a;
-  --muted: #64748b;
-  --surface: #ffffff;
-  --line: #cbd5e1;
-  --accent: #2563eb;
-  --danger: #b91c1c;
+  color-scheme: dark;
+  --bg: #120f0c;
+  --surface: #1e1915;
+  --surface-2: #2a231c;
+  --line: #3e3329;
+  --fg: #f3e9d8;
+  --muted: #b9aa92;
+  --gold: #e8b84a;
+  --gold-2: #f6d37a;
+  --gold-ink: #1c1405;
+  --secret: #b794f6;
+  --good: #6ee7a0;
+  --wait: #fbbf24;
+  --danger: #fca5a5;
+  --font-display: "Cinzel", Georgia, serif;
+  --font-body: "Alegreya Sans", system-ui, sans-serif;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1220;
-    --fg: #e2e8f0;
-    --muted: #94a3b8;
-    --surface: #131c2f;
-    --line: #334155;
-    --accent: #60a5fa;
-    --danger: #f87171;
-  }
-}
+
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.4 system-ui, sans-serif; }
-main { max-width: 640px; margin: 0 auto; padding: 16px; }
-main.wide { max-width: none; padding: 24px 32px; }
-h1, h2, h3 { margin: 0; }
-h1 { font-size: 1.4rem; }
-h2 { font-size: 1rem; }
-a { color: var(--accent); }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  color: var(--fg);
+  font: 17px/1.5 var(--font-body);
+  background:
+    radial-gradient(1200px 800px at 50% 40%, #1f1914 0%, transparent 70%),
+    radial-gradient(circle at 20% 10%, rgb(232 184 74 / 0.05), transparent 40%),
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: 0.02em; line-height: 1.2; }
+h2 { font-size: 1.15rem; }
+p { margin: 0; }
+a { color: var(--gold-2); }
+code { font-size: 0.85em; overflow-wrap: anywhere; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ── controls ─────────────────────────────────────────────────────────────── */
 button, select, input, textarea { font: inherit; color: inherit; }
-button { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 8px 12px; cursor: pointer; }
-button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
-input, textarea, select { border: 1px solid var(--line); border-radius: 8px; padding: 8px; background: var(--surface); width: 100%; }
-label { display: grid; gap: 4px; color: var(--muted); font-size: 0.85rem; }
-.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.error { color: var(--danger); }
-.hint, .empty, .note, .who { color: var(--muted); font-size: 0.9rem; }
-.top { display: grid; gap: 8px; margin-bottom: 16px; }
-.demo, .guild-switch { max-width: 280px; }
+button, .tab-link {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 8px 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--fg); text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s, box-shadow 0.2s;
+}
+button:hover { border-color: color-mix(in oklab, var(--gold) 60%, var(--line)); }
+button:active { transform: scale(0.97); }
+/* every plain button lifts on hover and ripples on press (tree nodes and overlays keep their own effects) */
+button:not(.tree-node, .levelup), .tab-link { position: relative; overflow: hidden; }
+button:not(.tree-node, .levelup):hover:not(:disabled), .tab-link:hover { transform: translateY(-1px); }
+button:not(.tree-node, .levelup):active:not(:disabled), .tab-link:active { transform: translateY(0) scale(0.97); }
+button:not(.tree-node, .levelup)::after, .tab-link::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 200%; aspect-ratio: 1; border-radius: 50%;
+  background: currentColor; opacity: 0; transform: translate(-50%, -50%) scale(1); pointer-events: none;
+  transition: transform 0.5s var(--ease-out), opacity 0.6s;
+}
+button:not(.tree-node, .levelup):active:not(:disabled)::after, .tab-link:active::after { transform: translate(-50%, -50%) scale(0); opacity: 0.22; transition: 0s; }
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+button.primary {
+  border-color: transparent; color: var(--gold-ink); font-weight: 700;
+  background: linear-gradient(180deg, var(--gold-2), var(--gold));
+  box-shadow: 0 6px 18px rgb(232 184 74 / 0.25), inset 0 1px 0 rgb(255 255 255 / 0.4);
+}
+button.primary:hover { box-shadow: 0 8px 26px rgb(232 184 74 / 0.4), inset 0 1px 0 rgb(255 255 255 / 0.4); }
+button[aria-busy="true"] { cursor: progress; opacity: 0.8; }
+button.big { width: 100%; min-height: 52px; font-size: 1.05rem; }
+.icon-btn { width: 44px; padding: 0; background: transparent; border-color: transparent; }
+.icon-btn:hover { background: var(--surface-2); }
 
-.tiers { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-.tiers ol { display: flex; gap: 6px; list-style: none; padding: 0; margin: 8px 0 0; flex-wrap: wrap; }
-.tier { padding: 4px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
-.tier span { opacity: 0.7; }
-.tier.reached { color: var(--fg); border-color: var(--fg); }
-.tier.own { background: var(--accent); border-color: var(--accent); color: #fff; }
+input, textarea, select {
+  width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); background: #15110e; color: var(--fg);
+}
+textarea { resize: vertical; }
+input::placeholder, textarea::placeholder { color: #8a7d69; }
+input[aria-invalid="true"], textarea[aria-invalid="true"] { border-color: var(--danger); }
+label { display: grid; gap: 6px; color: var(--muted); font-size: 0.95rem; }
+em { font-style: normal; font-size: 0.8em; color: var(--muted); padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; margin-left: 6px; }
 
-.card, .lane { background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--c); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
-.card header { display: flex; gap: 8px; align-items: center; }
-.card header h2 { flex: 1; }
-.progress { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
-.chain { display: flex; gap: 12px; overflow-x: auto; padding: 12px 2px 4px; }
-.chain.wrap { flex-wrap: wrap; overflow: visible; }
-
-.node { display: grid; justify-items: center; gap: 2px; min-width: 84px; max-width: 110px; text-align: center; border: 0; background: none; padding: 0; font-size: 0.8rem; color: inherit; }
-button.node { cursor: pointer; }
-.node .title { overflow-wrap: anywhere; }
-.node .pts { color: var(--muted); }
-.dot { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; border: 3px solid var(--line); font-weight: 700; transition: background 0.4s, box-shadow 0.4s, border-color 0.4s; }
-.dot.pending { border-color: var(--c); background: linear-gradient(90deg, var(--c) 50%, transparent 50%); }
-.dot.lit { border-color: var(--c); background: var(--c); color: var(--on, #fff); box-shadow: 0 0 14px var(--c); }
-.node.locked .dot { background: var(--bg); color: var(--muted); }
-.repeats { display: flex; gap: 3px; }
-.repeats i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); }
-.repeats i.on { background: var(--fg); border-color: var(--fg); }
-
-.sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); display: grid; align-items: end; }
-.sheet { background: var(--surface); border-radius: 16px 16px 0 0; padding: 16px; display: grid; gap: 12px; max-width: 640px; width: 100%; margin: 0 auto; }
-
-.queue { list-style: none; padding: 0; display: grid; gap: 12px; }
-.queue-item { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: grid; gap: 8px; }
-.stepper { display: grid; gap: 8px; }
-
-.board { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
-@media (max-width: 900px) { .board { grid-template-columns: 1fr; } }
-.board .dot { width: 64px; height: 64px; font-size: 1.4rem; }
-.board .node { min-width: 120px; max-width: 150px; font-size: 1rem; }
-.lane h2 { display: flex; gap: 8px; font-size: 1.2rem; }
-.leaders { list-style: none; padding: 0; display: grid; gap: 12px; }
-.leaders li { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; }
-.leaders .bar { grid-column: 1 / -1; height: 14px; border-radius: 7px; background: var(--accent); transition: width 0.8s ease; min-width: 4px; }
-@media (prefers-reduced-motion: reduce) { .dot, .leaders .bar { transition: none; } }
-
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .grow { flex: 1; }
-.panel, .mycode { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; display: grid; gap: 10px; justify-items: start; }
-.panel > label, .panel > form { width: 100%; }
-.mycode img { border-radius: 8px; background: #fff; }
-.mycode code { overflow-wrap: anywhere; }
-.staff { display: grid; gap: 4px; }
-.camera { width: 100%; max-height: 50vh; border-radius: 8px; background: #000; }
-.results { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; width: 100%; }
-.results li { padding: 6px 8px; border-radius: 6px; background: var(--bg); }
-.results li.ok { font-weight: 600; }
-.proof { max-width: 100%; max-height: 320px; border-radius: 8px; display: block; margin-top: 6px; }
+.error { color: var(--danger); }
+.hint, .note { color: var(--muted); font-size: 0.92rem; }
 
-/* ── Skill tree prototype (/tree). Scoped dark "night map" theme: re-points the shared tokens. ── */
-.tree-page {
-  --bg: #0e1521; --fg: #eaf0f8; --muted: #a3b1c6; --surface: #162033; --line: #2b3a55; --accent: #ffc24b; --danger: #fca5a5;
-  position: fixed; inset: 0; max-width: none; margin: 0; padding: 0;
-  display: grid; grid-template-rows: auto minmax(0, 1fr);
-  background: var(--bg); color: var(--fg);
-}
-.tree-page button.primary { color: #1a1305; font-weight: 600; }
-.tree-head { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-.tree-shell { position: relative; min-height: 0; }
+/* ── app shell ────────────────────────────────────────────────────────────── */
+.screen { position: fixed; inset: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); animation: page-in 0.45s var(--ease-out); }
+/* each screen (route, login → home, role switch) and each staff tab mounts fresh, so this plays on every page change */
+@keyframes page-in { from { opacity: 0; transform: translateY(14px); } }
+.screen.fuksi, .screen.staff { grid-template-rows: auto auto minmax(0, 1fr); }
+.center-msg { display: grid; place-items: center; padding: 24px; text-align: center; }
+.loading-rune { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold); animation: shimmer 1.6s ease-in-out infinite; }
+@keyframes shimmer { 50% { opacity: 0.45; } }
 
-/* the dot grid is the "you can drag this" affordance */
-.tree-viewport {
-  position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; cursor: grab;
-  background: radial-gradient(circle, #1e2a40 1px, transparent 1.5px) 0 0 / 28px 28px;
+.topbar {
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px 8px 16px; min-height: 60px;
+  border-bottom: 1px solid var(--line); background: rgb(18 15 12 / 0.88); backdrop-filter: blur(10px); z-index: 5;
 }
+.brand { display: inline-flex; align-items: center; gap: 8px; color: var(--gold); text-decoration: none; font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+.who { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--muted); font-size: 0.95rem; }
+.who b { color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.role { text-transform: capitalize; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); font-size: 0.8rem; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 4px; }
+.demo-compact, .guild-switch select { width: auto; max-width: 170px; min-height: 40px; padding: 6px 10px; font-size: 0.9rem; }
+.guild-switch { display: flex; }
+@media (max-width: 720px) {
+  .who .guild, .who .role, .brand span { display: none; }
+}
+
+/* ── welcome ──────────────────────────────────────────────────────────────── */
+.welcome-main { overflow-y: auto; padding: 32px 16px 48px; display: grid; align-content: start; justify-items: center; gap: 32px; }
+.hero { display: grid; justify-items: center; gap: 10px; text-align: center; max-width: 560px; color: var(--gold); animation: rise 0.6s var(--ease-out); }
+.hero h1 {
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
+  background: linear-gradient(180deg, var(--gold-2), var(--gold) 60%, #b07f22);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero p { color: var(--muted); font-size: 1.1rem; }
+.characters { width: min(880px, 100%); display: grid; gap: 16px; }
+.characters h2 { text-align: center; color: var(--muted); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.14em; }
+.character-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.character {
+  display: grid; justify-items: start; gap: 4px; padding: 18px; min-height: 120px; text-align: left; border-radius: 18px;
+  background: linear-gradient(160deg, var(--surface-2), var(--surface));
+  animation: rise 0.5s var(--ease-out) backwards;
+}
+.character:nth-child(2) { animation-delay: 40ms; } .character:nth-child(3) { animation-delay: 80ms; }
+.character:nth-child(4) { animation-delay: 120ms; } .character:nth-child(5) { animation-delay: 160ms; }
+.character:nth-child(6) { animation-delay: 200ms; } .character:nth-child(7) { animation-delay: 240ms; }
+.character svg { color: var(--gold); margin-bottom: 6px; }
+.character strong { font-family: var(--font-display); font-size: 1.1rem; }
+.character span { color: var(--muted); font-size: 0.92rem; }
+@media (hover: hover) { .character:hover { transform: translateY(-3px); border-color: var(--gold); box-shadow: 0 12px 30px rgb(0 0 0 / 0.4); } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+
+.panel { width: min(560px, 100%); display: grid; gap: 12px; align-content: start; padding: 18px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); }
+.panel h2 { display: flex; align-items: center; gap: 8px; }
+.panel > button { justify-self: start; }
+
+/* ── track chips (fuksi) ──────────────────────────────────────────────────── */
+.tracks { display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); background: rgb(18 15 12 / 0.7); z-index: 4; }
+.tracks::-webkit-scrollbar { display: none; }
+.track {
+  --c-hi: color-mix(in oklab, var(--c), white 40%);
+  flex: none; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 0.92rem; white-space: nowrap;
+  background:
+    linear-gradient(90deg, color-mix(in oklab, var(--c-hi) 70%, transparent) var(--pct), transparent var(--pct)) bottom / 100% 3px no-repeat,
+    var(--surface);
+}
+.track svg { color: var(--c-hi); }
+.track-pts { color: var(--muted); font-variant-numeric: tabular-nums; }
+.track.done { border-color: color-mix(in oklab, var(--c-hi) 70%, transparent); }
+.track.done .track-pts { color: var(--good); }
+
+/* ── skill tree ───────────────────────────────────────────────────────────── */
+.tree-shell { position: relative; min-height: 0; overflow: hidden; }
+/* the dot grid sits on its own static layer: painted on the viewport itself, it repainted with every pan frame */
+.tree-shell::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, rgb(232 184 74 / 0.09) 1px, transparent 1.6px) 0 0 / 30px 30px;
+}
+.tree-viewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; cursor: grab; }
 .tree-viewport:active { cursor: grabbing; }
-.tree-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
+/* hidden until SkillTree paints the first view; GPU layer only while moving, so resting text re-renders sharp */
+.tree-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; visibility: hidden; }
+.tree-world.moving, .tree-world.flying { will-change: transform; }
+.tree-world.flying { transition: transform 0.6s var(--ease-out); }
 
 .tree-edges { position: absolute; width: 1px; height: 1px; overflow: visible; }
-.tree-edges line { stroke: var(--line); stroke-width: 3; stroke-linecap: round; }
-.tree-edges line.open { stroke: var(--c); stroke-opacity: 0.55; stroke-dasharray: 2 9; }
-.tree-edges line.done { stroke: var(--c); stroke-width: 4; filter: drop-shadow(0 0 5px var(--c)); }
+/* unlit: a dark, unpowered tube. lit: a solid neon tube (white-hot core + coloured glow) = your progress */
+.tree-edges path { fill: none; stroke-linecap: round; }
+.tree-edges path.base { stroke: color-mix(in oklab, var(--c) 28%, #2b241d); stroke-width: 3; }
+.tree-edges path.neon {
+  stroke: color-mix(in oklab, var(--c), white 60%); stroke-width: 4;
+  filter: drop-shadow(0 0 2px var(--c)) drop-shadow(0 0 7px var(--c)) drop-shadow(0 0 16px var(--c));
+}
+/* a freshly approved line powers up: it draws on from the parent node, then flickers like a neon tube striking */
+.tree-edges path.neon.draw {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: draw 0.7s cubic-bezier(0.6, 0, 0.4, 1) var(--delay) forwards, flicker 0.6s linear calc(var(--delay) + 0.7s);
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes flicker { 0% { opacity: 1; } 12% { opacity: 0.3; } 24% { opacity: 1; } 40% { opacity: 0.55; } 55%, 100% { opacity: 1; } }
 
-/* node: the dot's centre sits exactly on position (translate by half the 64px dot) */
+.tree-hub { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); }
+.hub {
+  position: relative; width: 180px; height: 180px; border-radius: 50%; display: grid; place-content: center; justify-items: center; text-align: center;
+  background: radial-gradient(circle at 50% 35%, #2f261d, #18130f 70%); border: 1px solid #4a3c2e;
+  box-shadow: 0 0 0 10px rgb(232 184 74 / 0.06), 0 0 60px rgb(232 184 74 / 0.18);
+}
+.hub svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hub-track { fill: none; stroke: #3a2f25; stroke-width: 7; }
+.hub-ring { fill: none; stroke: var(--gold); stroke-width: 7; stroke-linecap: round; filter: drop-shadow(0 0 6px rgb(232 184 74 / 0.6)); transition: stroke-dasharray 1s var(--ease-out); }
+.hub-pts { font-family: var(--font-display); font-size: 2.8rem; line-height: 1; color: var(--gold-2); font-variant-numeric: tabular-nums; }
+.hub-unit { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.14em; }
+.hub-tier { font-family: var(--font-display); font-size: 1rem; margin-top: 4px; }
+.hub-next { font-size: 0.82rem; color: var(--muted); max-width: 130px; }
+.guild-hub { gap: 4px; color: var(--gold); }
+.guild-hub .hub-tier { color: var(--fg); font-size: 1.05rem; max-width: 140px; }
+
+.tree-banner {
+  position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  padding: 8px 14px; border-radius: 999px; font-family: var(--font-display); font-weight: 700;
+  border: 1px solid color-mix(in oklab, var(--c), white 25%); color: color-mix(in oklab, var(--c), white 45%);
+  background: color-mix(in oklab, var(--c) 18%, var(--bg));
+}
+.tree-banner b { font-family: var(--font-body); color: var(--fg); font-variant-numeric: tabular-nums; }
+
+/* node: the dot's centre sits exactly on its position (translate by half the 60px dot) */
 .tree-node {
-  position: absolute; width: 128px; transform: translate(-50%, -32px);
-  display: grid; justify-items: center; gap: 6px;
-  border: 0; padding: 0; background: none; color: inherit; font-size: 13px; cursor: pointer;
+  --c-hi: color-mix(in oklab, var(--c), white 40%);
+  position: absolute; width: 124px; transform: translate(-50%, -30px);
+  display: grid; justify-items: center; gap: 4px; min-height: 0; padding: 0;
+  border: 0; background: none; border-radius: 0; color: inherit; font-size: 13px; cursor: pointer;
 }
+div.tree-node { cursor: default; }
+.tree-node:hover { border: 0; }
+.tree-node:active { transform: translate(-50%, -30px); }
 .tree-dot {
-  display: grid; place-items: center; width: 64px; height: 64px; box-sizing: border-box; border-radius: 50%;
-  border: 3px solid #3a4a66; background: var(--surface); color: var(--muted);
-  transition: transform 0.15s ease, box-shadow 0.3s ease;
+  position: relative; display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%;
+  border: 3px solid color-mix(in oklab, var(--c-hi) 65%, var(--line)); background: radial-gradient(circle at 50% 30%, #2a221b, #17120e);
+  color: var(--c-hi); transition: transform 0.18s var(--ease-out), box-shadow 0.25s;
 }
-.tree-label { max-width: 128px; text-align: center; line-height: 1.2; text-shadow: 0 1px 3px var(--bg); }
-.tree-viewport.far .tree-label { display: none; } /* zoomed out: dots only, tooltips still work */
+.tree-label { max-width: 124px; text-align: center; line-height: 1.2; font-weight: 500; text-shadow: 0 1px 3px var(--bg), 0 0 8px var(--bg); }
+.tree-pts { font-size: 11px; padding: 0 7px; border-radius: 999px; color: var(--muted); background: rgb(18 15 12 / 0.8); border: 1px solid var(--line); }
+.tree-pips { display: flex; gap: 3px; }
+.tree-pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); }
+.tree-pips i.half { border-color: var(--wait); background: linear-gradient(90deg, var(--wait) 50%, transparent 50%); }
+.tree-pips i.on { background: var(--c-hi); border-color: var(--c-hi); }
+.tree-viewport.far .tree-label, .tree-viewport.far .tree-pts, .tree-viewport.far .tree-pips { visibility: hidden; }
 
-.tree-node.locked { cursor: not-allowed; opacity: 0.5; }
-.tree-node.locked .tree-dot { border-style: dashed; background: var(--bg); }
-
-/* available: the only animated state, a slow breathing ring in the category colour */
-.tree-node.available .tree-dot { border-color: var(--c); color: var(--c); animation: tree-breathe 2.6s ease-in-out infinite; }
-@keyframes tree-breathe {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--c) 50%, transparent); }
-  50% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--c) 0%, transparent); }
-}
-
-/* pending is the same yellow everywhere so "waiting for my tutor" reads at a glance */
-.tree-node.pending .tree-dot { border-color: #ffc24b; background: #2a220c; color: #ffc24b; }
-
-.tree-node.completed .tree-dot {
-  border-color: var(--c); background: var(--c); color: var(--bg);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--c) 70%, transparent);
-}
-
-.tree-node.selected .tree-dot { outline: 3px solid var(--fg); outline-offset: 4px; }
-.tree-node:focus-visible { outline: none; }
-.tree-node:focus-visible .tree-dot { outline: 3px solid var(--accent); outline-offset: 4px; }
-
-.tree-tip {
-  position: absolute; bottom: calc(100% + 4px); white-space: nowrap; pointer-events: none;
-  padding: 4px 8px; border-radius: 8px; background: var(--fg); color: var(--bg); font-size: 12px; font-weight: 600;
-  opacity: 0; transform: translateY(4px); transition: opacity 0.15s, transform 0.15s;
-}
 @media (hover: hover) {
-  .tree-node.available:hover .tree-dot, .tree-node.completed:hover .tree-dot { transform: scale(1.12); }
-  .tree-node.available:hover .tree-tip, .tree-node.completed:hover .tree-tip { opacity: 1; transform: none; }
+  button.tree-node:hover .tree-dot { transform: scale(1.12); box-shadow: 0 0 0 6px color-mix(in oklab, var(--c) 25%, transparent); }
+}
+.tree-node:focus-visible { outline: none; }
+.tree-node:focus-visible .tree-dot { outline: 3px solid var(--gold); outline-offset: 4px; }
+
+.tree-node.lit .tree-dot {
+  border-color: var(--c-hi); background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c), white 25%), var(--c));
+  color: var(--on); box-shadow: 0 0 22px color-mix(in oklab, var(--c) 75%, transparent);
+}
+.tree-node.lit .tree-label { color: var(--fg); }
+.tree-node.pending .tree-dot { border-style: dashed; border-color: var(--wait); animation: wait 1.8s ease-in-out infinite; }
+@keyframes wait { 50% { box-shadow: 0 0 0 7px rgb(251 191 36 / 0.18); } }
+.tree-badge { position: absolute; right: -4px; top: -4px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); }
+.tree-badge.done { background: var(--gold); color: var(--gold-ink); }
+.tree-badge.wait { background: var(--wait); color: var(--gold-ink); }
+.tree-node.locked .tree-dot { border: 3px dashed var(--secret); color: var(--secret); background: radial-gradient(circle, #2a1f40, #140f1d); box-shadow: 0 0 18px rgb(183 148 246 / 0.25); }
+.tree-node.locked .tree-label { color: var(--secret); letter-spacing: 0.2em; }
+
+/* burst: a node that just lit up (when its neon line arrives: --delay) or unlocked ignites, rings out and
+   throws sparks. Plays once per mount; until --delay it still looks unlit. */
+.tree-node.burst .tree-dot { animation: ignite 0.8s cubic-bezier(0.3, 1.6, 0.5, 1) var(--delay, 0s) both; }
+.tree-node.burst .tree-dot::before {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid var(--c-hi); pointer-events: none;
+  animation: ring-out 1s ease-out var(--delay, 0s) both;
+}
+.tree-node.burst .tree-dot::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 -44px 0 var(--gold-2), 31px -31px 0 var(--c-hi), 44px 0 0 var(--gold-2), 31px 31px 0 var(--c-hi),
+              0 44px 0 var(--gold-2), -31px 31px 0 var(--c-hi), -44px 0 0 var(--gold-2), -31px -31px 0 var(--c-hi);
+  animation: sparks 0.9s ease-out var(--delay, 0s) both;
+}
+@keyframes ignite { 0% { filter: grayscale(1) brightness(0.55); transform: scale(1); } 40% { filter: none; transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes ring-out { 0% { transform: scale(1); opacity: 0; } 8% { opacity: 1; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes sparks { 0% { transform: scale(0.3); opacity: 0; } 8% { opacity: 1; } 100% { transform: scale(1.9); opacity: 0; } }
+.tree-node.selected .tree-dot { outline: 3px solid var(--gold); outline-offset: 5px; }
+
+/* one tap on a node: what to do. Side card on wide screens, above the dock on phones. */
+.info {
+  --c-hi: color-mix(in oklab, var(--c), white 40%);
+  position: fixed; z-index: 6; right: 16px; top: 140px; width: min(380px, calc(100% - 32px)); max-height: calc(100% - 260px); overflow-y: auto;
+  display: grid; gap: 12px; align-content: start; padding: 18px 20px; border-radius: 22px; border: 1px solid var(--line);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--c) 14%, var(--surface)), var(--surface) 140px);
+  box-shadow: 0 20px 50px rgb(0 0 0 / 0.5); animation: info-in 0.25s var(--ease-out);
+}
+.info .sheet-title h2 { font-size: 1.4rem; }
+.info .status-line { display: flex; align-items: center; gap: 6px; }
+@keyframes info-in { from { opacity: 0; transform: translateX(16px); } }
+@media (max-width: 720px) {
+  .info { left: 12px; right: 12px; top: auto; bottom: 96px; width: auto; max-height: 55dvh; animation-name: sheet-up; }
 }
 
-.tree-controls { position: absolute; left: 16px; top: 16px; display: flex; gap: 8px; }
-.tree-controls button { min-width: 44px; height: 44px; background: var(--surface); }
+.tree-controls { position: absolute; right: 12px; bottom: 96px; display: grid; gap: 8px; z-index: 2; }
+.tree-controls button { width: 46px; height: 46px; padding: 0; border-radius: 50%; background: rgb(30 25 21 / 0.92); box-shadow: 0 6px 16px rgb(0 0 0 / 0.35); }
 
-.tree-panel {
-  position: absolute; top: 16px; right: 16px; bottom: 16px; width: min(360px, calc(100% - 32px)); overflow: auto;
-  display: grid; align-content: start; gap: 10px; padding: 20px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 20px;
-  box-shadow: 0 20px 50px rgb(0 0 0 / 0.45); animation: tree-slide-in 0.2s ease-out;
+/* ── dock, toasts, level up ───────────────────────────────────────────────── */
+.dock {
+  position: fixed; left: 50%; bottom: max(16px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+  display: flex; gap: 6px; padding: 6px; border-radius: 22px; border: 1px solid var(--line);
+  background: rgb(30 25 21 / 0.92); backdrop-filter: blur(10px); box-shadow: 0 14px 40px rgb(0 0 0 / 0.5);
 }
-.tree-panel .row { justify-content: space-between; }
-.tree-panel h2 { font-size: 1.4rem; }
-.tree-panel h3 { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-top: 6px; }
-.tree-panel p { margin: 0; }
-.tree-lore { font-style: italic; color: #c9d3e2; }
-.tree-reward { font-variant-numeric: tabular-nums; }
-.tree-reward strong { color: var(--c); font-size: 1.2rem; }
-.tree-close { width: 44px; height: 44px; font-size: 1.4rem; line-height: 1; }
-.tree-chip { padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; border: 1px solid var(--line); }
-.tree-chip.available { border-color: var(--c); color: var(--c); }
-.tree-chip.pending { background: #2a220c; border-color: #ffc24b; color: #ffc24b; }
-.tree-chip.completed { background: var(--c); border-color: var(--c); color: var(--bg); }
-@keyframes tree-slide-in { from { transform: translateX(24px); opacity: 0; } }
-@media (max-width: 640px) {
-  .tree-panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 70%; border-radius: 20px 20px 0 0; animation-name: tree-slide-up; }
-}
-@keyframes tree-slide-up { from { transform: translateY(24px); opacity: 0; } }
+.dock button { flex-direction: column; gap: 2px; min-width: 88px; min-height: 58px; border-color: transparent; background: transparent; font-size: 0.85rem; color: var(--muted); }
+.dock button svg { color: var(--gold); }
+.dock button:hover { color: var(--fg); background: var(--surface-2); }
 
-.tree-modal {
-  width: min(480px, calc(100% - 32px)); padding: 0; border: 1px solid var(--line); border-radius: 20px;
-  background: var(--surface); color: var(--fg); box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 40%, transparent), 0 24px 60px rgb(0 0 0 / 0.5);
+.toasts { position: fixed; top: 132px; left: 50%; transform: translateX(-50%); z-index: 7; display: grid; gap: 8px; justify-items: center; pointer-events: none; width: min(92vw, 460px); }
+.toast {
+  display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 14px; font-weight: 500;
+  background: var(--surface-2); border: 1px solid var(--line); box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  animation: toast 4s var(--ease-out) forwards;
 }
-.tree-modal::backdrop { background: rgb(5 9 16 / 0.7); }
-.tree-modal form { display: grid; gap: 14px; padding: 20px; }
-.tree-modal h2 { font-size: 1.4rem; }
-.tree-modal-kicker { margin: 0; color: var(--muted); font-size: 0.85rem; }
-.tree-modal-reward { margin: 4px 0 0; color: var(--c); font-weight: 600; }
-.tree-modal-actions { justify-content: flex-end; }
-.tree-drop {
-  position: relative; place-items: center; min-height: 96px; padding: 12px; text-align: center; cursor: pointer;
-  border: 2px dashed var(--line); border-radius: 14px; background: var(--bg); color: var(--fg);
+.toast.good { border-color: var(--gold); color: var(--gold-2); }
+.toast.secret { border-color: var(--secret); color: var(--secret); }
+.board-side .toast { animation-duration: 8s; }
+@keyframes toast { 0% { opacity: 0; transform: translateY(-10px) scale(0.96); } 8%, 85% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-6px); } }
+@keyframes toast-fade { 0%, 85% { opacity: 1; } 100% { opacity: 0; } }
+
+.levelup {
+  position: fixed; inset: 0; z-index: 20; border: 0; border-radius: 0; padding: 24px;
+  background: radial-gradient(circle, rgb(232 184 74 / 0.28), rgb(10 8 6 / 0.88) 60%); backdrop-filter: blur(4px);
+  animation: fade-in 0.3s ease-out;
 }
-.tree-drop:focus-within { border-color: var(--accent); }
-.tree-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.levelup:hover { border: 0; }
+.levelup:active { transform: none; }
+.levelup-card { display: grid; justify-items: center; gap: 6px; color: var(--gold); animation: pop-in 0.7s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.levelup-card svg { filter: drop-shadow(0 0 18px rgb(232 184 74 / 0.8)); animation: crown 2.4s ease-in-out infinite; }
+.levelup-kicker { text-transform: uppercase; letter-spacing: 0.3em; font-size: 0.9rem; color: var(--muted); }
+.levelup-card strong { font-family: var(--font-display); font-size: clamp(2.2rem, 9vw, 4rem); color: var(--gold-2); text-shadow: 0 0 30px rgb(232 184 74 / 0.5); }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.6); } }
+@keyframes crown { 50% { transform: translateY(-6px) rotate(-4deg); } }
+
+/* ── sheets (native <dialog>) ─────────────────────────────────────────────── */
+dialog.sheet {
+  --c-hi: color-mix(in oklab, var(--c, var(--gold)), white 40%);
+  width: min(560px, 100%); max-width: 100%; max-height: 90dvh; margin: auto auto 0; padding: 0; overflow-y: auto;
+  border: 1px solid var(--line); border-bottom: 0; border-radius: 24px 24px 0 0;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--c, var(--gold)) 12%, var(--surface)), var(--surface) 140px);
+  color: var(--fg); box-shadow: 0 -20px 60px rgb(0 0 0 / 0.55);
+  animation: sheet-up 0.28s var(--ease-out);
+}
+dialog.sheet::backdrop { background: rgb(8 6 4 / 0.65); backdrop-filter: blur(3px); }
+@media (min-width: 720px) { dialog.sheet { margin: auto; border-bottom: 1px solid var(--line); border-radius: 24px; } }
+@keyframes sheet-up { from { transform: translateY(32px); opacity: 0; } }
+.sheet form, .sheet-body { display: grid; gap: 14px; padding: 18px 20px max(20px, env(safe-area-inset-bottom)); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.track-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-size: 0.88rem; color: var(--c-hi); border: 1px solid color-mix(in oklab, var(--c-hi) 50%, transparent); }
+.sheet-title { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sheet-title h2 { font-size: 1.6rem; }
+.reward { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 4px 12px; border-radius: 999px; font-weight: 700; color: var(--gold-ink); background: linear-gradient(180deg, var(--gold-2), var(--gold)); }
+.status-line { color: var(--muted); font-size: 0.95rem; }
+.status-line.wait { color: var(--wait); }
+.status-line.done { color: var(--good); }
+.desc { color: #ddd0bb; }
+.field span { display: flex; align-items: center; }
+.drop {
+  position: relative; display: flex; align-items: center; gap: 14px; min-height: 84px; padding: 12px 16px; cursor: pointer;
+  border: 2px dashed var(--line); border-radius: 16px; background: #15110e; color: var(--fg);
+  transition: border-color 0.15s, background 0.15s;
+}
+.drop svg { color: var(--gold); flex: none; }
+.drop:hover, .drop:focus-within { border-color: var(--gold); background: #1a1511; }
+.drop.has { border-style: solid; border-color: var(--good); }
+.drop img { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; flex: none; }
+.drop span { overflow-wrap: anywhere; }
+.drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.sheet-actions { position: sticky; bottom: 0; padding-top: 4px; }
+.section-title { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin-top: 4px; }
+
+.levels { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.levels li { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); color: var(--muted); }
+.levels li span { flex: 1; font-family: var(--font-display); }
+.levels li.reached { color: var(--gold-2); border-color: color-mix(in oklab, var(--gold) 50%, var(--line)); background: rgb(232 184 74 / 0.07); }
+
+.mycode { display: grid; gap: 12px; justify-items: center; }
+.mycode img { border-radius: 16px; background: #fff; padding: 8px; box-shadow: 0 0 0 4px rgb(232 184 74 / 0.4), 0 0 40px rgb(232 184 74 / 0.25); max-width: 100%; height: auto; }
+
+/* ── leaderboard ──────────────────────────────────────────────────────────── */
+.leaders { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.leaders li { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 4px 10px; }
+.leaders .rank { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--surface-2); font-weight: 700; color: var(--muted); }
+.leaders .name { font-weight: 500; }
+.leaders strong { font-variant-numeric: tabular-nums; }
+.leaders .bar { grid-column: 2 / -1; height: 10px; min-width: 6px; border-radius: 6px; background: linear-gradient(90deg, #8a6a2a, var(--gold)); transition: width 0.9s var(--ease-out); }
+.leaders li.first .rank { background: var(--gold); color: var(--gold-ink); box-shadow: 0 0 16px rgb(232 184 74 / 0.5); }
+.leaders li.first .bar { box-shadow: 0 0 14px rgb(232 184 74 / 0.5); }
+
+/* ── staff ────────────────────────────────────────────────────────────────── */
+.tabs { display: flex; gap: 4px; padding: 8px 12px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); }
+.tabs button, .tab-link { flex: none; border-color: transparent; background: transparent; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--gold-2); background: var(--surface-2); border-color: color-mix(in oklab, var(--gold) 45%, var(--line)); }
+.tab-link { margin-left: auto; }
+.staff-main { overflow-y: auto; padding: 20px max(16px, calc((100% - 760px) / 2)) 48px; display: grid; gap: 16px; align-content: start; }
+.staff-main > .panel { width: 100%; }
+.staff-main { animation: page-in 0.35s var(--ease-out); }
+.queue { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; width: 100%; }
+.queue-item { display: grid; gap: 12px; padding: 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); animation: rise 0.35s var(--ease-out) backwards; }
+.queue-item strong { font-family: var(--font-display); }
+.queue-item .row button { flex: 1; }
+.proof { display: block; max-width: 100%; max-height: 360px; margin-top: 8px; border-radius: 12px; }
+.stepper { display: grid; gap: 8px; }
+.empty-state { display: grid; justify-items: center; gap: 10px; padding: 48px 16px; color: var(--muted); text-align: center; }
+.empty-state svg { color: var(--gold); }
+.camera { width: 100%; max-height: 50vh; border-radius: 14px; background: #000; }
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; }
+.results li { padding: 10px 12px; border-radius: 10px; background: #15110e; border-left: 4px solid var(--danger); }
+.results li.ok { border-left-color: var(--good); font-weight: 700; animation: pop-in 0.3s var(--ease-out); }
+
+/* ── projector ────────────────────────────────────────────────────────────── */
+.board { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+.board .tree-controls { bottom: 16px; }
+.board-side { overflow-y: auto; padding: 24px; border-left: 1px solid var(--line); background: rgb(30 25 21 / 0.6); display: grid; gap: 20px; align-content: start; }
+.board-side h2 { display: flex; align-items: center; gap: 10px; font-size: 1.4rem; color: var(--gold); }
+.board-side .leaders { gap: 18px; font-size: 1.15rem; }
+.live { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body); font-size: 0.8rem; color: var(--danger); text-transform: uppercase; letter-spacing: 0.12em; }
+.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; animation: shimmer 1.2s ease-in-out infinite; }
+.projector .tree-label { font-size: 15px; }
+@media (max-width: 900px) {
+  .board { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .board-side { border-left: 0; border-top: 1px solid var(--line); max-height: 40vh; }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .tree-node.available .tree-dot { animation: none; box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 30%, transparent); }
-  .tree-dot, .tree-tip, .tree-panel { transition: none; animation: none; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  /* toasts still need to stay readable, then leave: fade only, full duration */
+  .toast { animation: toast-fade 4s linear forwards !important; }
 }

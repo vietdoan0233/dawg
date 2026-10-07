@@ -1,78 +1,44 @@
 "use client";
-import { useEffect, useState, type CSSProperties } from "react";
-import { loadLeaderboard, loadRoadmap, type LeaderRow, type Roadmap } from "@/lib/roadmap";
-import { iconGlyph } from "@/lib/icons";
-import { NodeDot } from "./NodeDot";
-import { Tiers } from "./Tiers";
+import { useMemo } from "react";
+import { useRoadmap } from "@/lib/roadmap";
+import { Icon } from "./Icon";
+import { Leaderboard } from "./Leaderboard";
+import { SkillTree } from "./SkillTree";
 
-const POLL_MS = 5000;
+// Projector: the guild's map without anyone's progress (keyholes stay locked until the captain reveals them)
+// plus the live tutor-group leaderboard. Log the projector in as a fuksi: staff accounts see secrets unlocked.
+export function ProjectorBoard({ guildId, guildName }: { guildId: number; guildName: string }) {
+  const { map, error, news } = useRoadmap(guildId);
+  const burst = useMemo(() => new Set((news?.revealed ?? []).map((id) => `n${id}`)), [news]);
 
-// Projector: the full 2D map plus the animated tutor-group leaderboard. Polls every 5 s, so an approval
-// (or a later secret reveal) shows up on the next poll. The map shows the logged-in member's node states.
-export function ProjectorBoard({ guildId }: { guildId: number }) {
-  const [map, setMap] = useState<Roadmap | null>(null);
-  const [rows, setRows] = useState<LeaderRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  if (!map) return <div className="center-msg">{error ? <p className="error">{error}</p> : <p className="loading-rune">Loading the map…</p>}</div>;
 
-  useEffect(() => {
-    let alive = true;
-    const poll = () => {
-      Promise.all([loadRoadmap(guildId), loadLeaderboard(guildId)]).then(
-        ([m, r]) => {
-          if (!alive) return;
-          setMap(m);
-          setRows(r);
-          setError(null);
-        },
-        (e: Error) => alive && setError(e.message),
-      );
-    };
-    poll();
-    const timer = setInterval(poll, POLL_MS);
-    return () => {
-      alive = false;
-      clearInterval(timer);
-    };
-  }, [guildId]);
-
-  if (error && !map) return <p className="error">{error}</p>;
-  if (!map) return <p>Loading the map…</p>;
-
-  const top = Math.max(1, ...rows.map((r) => r.total_points));
+  const secrets = map.nodes.filter((n) => n.locked).length;
   return (
     <div className="board">
-      <section className="board-map" aria-label="Guild map">
-        {map.categories.map((c) => {
-          const color = c.color;
-          const nodes = map.nodes.filter((n) => n.category_id === c.id);
-          return (
-            <div key={c.id} className="lane" style={{ "--c": color } as CSSProperties}>
-              <h2>
-                <span aria-hidden>{iconGlyph(c.icon)}</span> {c.name}
-                <span className="progress">{c.min_points ? `${c.points}/${c.min_points}p` : `${c.points}p`}</span>
-              </h2>
-              <div className="chain wrap">
-                {nodes.map((n, j) => (
-                  <NodeDot key={n.locked ? `lock-${j}` : n.id} node={n} color={color} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </section>
+      <SkillTree
+        map={map}
+        personal={false}
+        fit
+        burst={burst}
+        hub={
+          <div className="hub guild-hub">
+            <Icon name="shield" size={40} />
+            <span className="hub-tier">{guildName}</span>
+            <span className="hub-next">{secrets ? `${secrets} secret${secrets > 1 ? "s" : ""} still locked` : "All secrets revealed"}</span>
+          </div>
+        }
+      />
       <aside className="board-side">
-        <Tiers map={map} />
-        <h2>Tutor groups</h2>
-        <ol className="leaders">
-          {rows.map((r) => (
-            <li key={r.group_id}>
-              <span>{r.group_name}</span>
-              <span className="bar" style={{ width: `${(r.total_points / top) * 100}%` }} />
-              <strong>{r.total_points}p</strong>
-            </li>
-          ))}
-        </ol>
-        {error && <p className="error">Connection problem, retrying: {error}</p>}
+        <h2>
+          <Icon name="trophy" /> Tutor groups <span className="live">live</span>
+        </h2>
+        <Leaderboard guildId={guildId} />
+        {news && news.revealed.length > 0 && (
+          <p key={news.n} className="toast secret">
+            <Icon name="keyhole" size={18} /> A secret node was revealed!
+          </p>
+        )}
       </aside>
     </div>
   );

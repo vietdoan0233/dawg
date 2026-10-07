@@ -1,44 +1,64 @@
 "use client";
 import { useState } from "react";
 import { db } from "@/lib/supabase";
+import { Icon } from "./Icon";
 
 // Demo project only: seeded users share one password (supabase/seed.sql). The pilot project has
 // password sign-in disabled, so this cannot work there even if shipped.
 const DEMO_PASSWORD = "demo-password";
 const DEMO_USERS = [
-  { label: "Fuksi 1 (Group A)", email: "demo.fuksi.1@demo.invalid" },
-  { label: "Fuksi 2 (Group A)", email: "demo.fuksi.2@demo.invalid" },
-  { label: "Fuksi 3 (Group B)", email: "demo.fuksi.3@demo.invalid" },
-  { label: "Tutor A", email: "demo.tutor.a@demo.invalid" },
-  { label: "Tutor B", email: "demo.tutor.b@demo.invalid" },
-  { label: "Organizer", email: "demo.organizer@demo.invalid" },
-  { label: "Captain", email: "demo.captain@demo.invalid" },
+  { label: "Fuksi 1", sub: "Group A · fill your skill tree", icon: "star", email: "demo.fuksi.1@demo.invalid" },
+  { label: "Fuksi 2", sub: "Group A · fill your skill tree", icon: "star", email: "demo.fuksi.2@demo.invalid" },
+  { label: "Fuksi 3", sub: "Group B · fill your skill tree", icon: "star", email: "demo.fuksi.3@demo.invalid" },
+  { label: "Tutor A", sub: "Review Group A's proofs", icon: "inbox", email: "demo.tutor.a@demo.invalid" },
+  { label: "Tutor B", sub: "Review Group B's proofs", icon: "inbox", email: "demo.tutor.b@demo.invalid" },
+  { label: "Organizer", sub: "Check people in at events", icon: "scan", email: "demo.organizer@demo.invalid" },
+  { label: "Captain", sub: "Run the guild, reveal secrets", icon: "crown", email: "demo.captain@demo.invalid" },
 ];
 
-export function DemoSwitcher({ current }: { current?: string }) {
+export function DemoSwitcher({ current, compact = false }: { current?: string; compact?: boolean }) {
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   if (process.env.NEXT_PUBLIC_DEMO !== "1") return null;
 
   const logInAs = async (email: string) => {
     setError(null);
+    setBusy(email);
     const { error } = await db().auth.signInWithPassword({ email, password: DEMO_PASSWORD });
+    setBusy(null);
     if (error) setError(error.message);
   };
 
+  if (compact) {
+    return (
+      <select className="demo-compact" value="" aria-label="Switch demo user" onChange={(e) => e.target.value && void logInAs(e.target.value)}>
+        <option value="">{current ? `Demo: ${current}` : "Demo user…"}</option>
+        {DEMO_USERS.map((u) => (
+          <option key={u.email} value={u.email}>
+            {u.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
   return (
-    <div className="demo">
-      <label>
-        Log in as
-        <select value="" onChange={(e) => e.target.value && void logInAs(e.target.value)}>
-          <option value="">{current ?? "choose a demo user…"}</option>
-          {DEMO_USERS.map((u) => (
-            <option key={u.email} value={u.email}>
-              {u.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      {error && <p className="error">{error}</p>}
-    </div>
+    <section className="characters" aria-label="Choose a demo user">
+      <h2>Choose your character</h2>
+      <div className="character-grid">
+        {DEMO_USERS.map((u) => (
+          <button key={u.email} type="button" className="character" aria-busy={busy === u.email} onClick={() => void logInAs(u.email)}>
+            <Icon name={u.icon} size={28} />
+            <strong>{u.label}</strong>
+            <span>{u.sub}</span>
+          </button>
+        ))}
+      </div>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
+    </section>
   );
 }
