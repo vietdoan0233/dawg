@@ -1,6 +1,6 @@
 # Fuksipisteet progress
 
-Updated: 2026-10-06
+Updated: 2026-10-07
 
 ## The plan in one picture
 
@@ -8,15 +8,19 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 
 | Slice | What it adds | Status |
 |---|---|---|
-| 1. Walking skeleton | Demo login → fuksi sees their map → submits a task → tutor approves → node lights up → projector shows it | **Done.** Database tests pass. Waiting on PR + review |
-| 2. Auth & hardening | Real email login, invites, roles, more security tests | **Built** (branch `slice/2-auth`) |
-| 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype built** |
-| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype built** |
-| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal built**; import/export not started |
+| 1. Walking skeleton | Demo login → fuksi sees their map → submits a task → tutor approves → node lights up → projector shows it | **Done**, in `main`. Seed now holds the real Data Guild map (55 nodes); a few values still unconfirmed |
+| 2. Auth & hardening | Real email login, invites, roles, more security tests | **Done**, in `main`. Needs production email + auth hooks before a pilot |
+| 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype**, in `main`. See shortcuts below |
+| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype**, in `main`. No 30-day purge, the server doesn't compute the photo hash |
+| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal done**, **UI polish done** (see below). Import/export **not started** |
+| UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
-## Where we are (slice 1)
+**Next up:** slice 5 import/export, then hardening the slice 3–4 prototypes (see the shortcut list).
 
-Branch `slice/1-walking-skeleton`.
+Everything is merged into `main` and pushed; the merged branches are deleted. They went in without PRs.
+Database tests: 7 files, 200/200 pass (last run for slice 2, 2026-10-06). Not re-run since the seed changed (2026-10-07).
+
+## Slice 1: walking skeleton (merged)
 
 **Done**
 - App pages: fuksi map, tutor/captain review queue, projector board with leaderboard.
@@ -30,11 +34,11 @@ Branch `slice/1-walking-skeleton`.
   - an old login lookup could overwrite a newer one
   - demo login was on by default in `.env.example`
 
-**Not done yet: needed to finish slice 1**
-1. **Get the real Data Guild roadmap** (the image or a list of nodes with category, points, repeats, who reviews, photo yes/no, secret yes/no). The seed only has placeholder nodes for now.
-2. **Open a PR to `main`** and get a teammate's review, then merge.
+**Still open**
+1. Data Guild to confirm the seed's placeholders: season dates, the 8 write-in "+ my own event" points (1p), the Teekkarijäynä ceiling (10p), which nodes need a photo vs a check-in, and what the 4 secret keyholes are (`Secret 1-4`, 3p).
+2. A teammate's review of what is in `main` is still owed (AGENTS.md).
 
-## Prototype (branch `slice/3-5-prototype`, built 2026-10-06)
+## Slices 3–5 prototype (merged, built 2026-10-06)
 
 The whole 3-minute demo from SDD §7 works end to end. It was clicked through in a real browser:
 fuksi shows their QR → organizer/tutor checks them in and the node lights up → fuksi uploads a photo → tutor
@@ -45,24 +49,22 @@ What was added:
   22 new database tests (158 total, all pass).
 - Screens: "Show my QR" for fuksis, a check-in scanner for staff (camera on Chrome/Android, typing the code elsewhere,
   and scans wait on the phone when offline), photo upload, photos and "Approve all" in the review queue, and a reveal panel for the captain.
-- Demo data: a demo organizer plus 6 **placeholder** nodes (not the real Data Guild map) so the demo has something to show.
 
 Known prototype shortcuts (fix before a real pilot):
-- The UI is rough. Polish comes later.
 - Photos are never deleted yet (needs the 30-day purge function).
 - Photo duplicate check trusts the hash the phone sends.
 - The QR camera only works where the browser has a built-in QR reader (Chrome on Android). Elsewhere you type the code.
 - Captain can only *reveal* a node, not edit it yet.
 - No limit on how many photos one person uploads (needs the purge job or a quota).
-- QR codes never change. A leaked code works all season (needs a "new code" button, `rotate_my_code`).
+- ~~QR codes never change~~: fixed in slice 2 (`rotate_my_code`, "Make a new QR code").
 - Any tutor can check in any fuksi in the guild, not only their own group. Probably fine; confirm with the team.
 - The check-in time the phone reports is checked but not saved, so a late check-in can't be audited yet.
 
-## Slice 2: real login (branch `slice/2-auth`, built 2026-10-06)
+## Slice 2: real login (merged, built 2026-10-06)
 
 Two modes, one codebase:
 - `npm run dev` = **real app**: log in with your @aalto.fi email + a 6-digit code.
-- `npm run demo` = **pitch demo**: the "Log in as…" switcher with demo users.
+- `npm run demo` = **pitch demo**: the "Choose your character" screen with demo users.
 
 What works (tested in a real browser):
 - Log in with a 6-digit email code. Non-@aalto.fi emails are refused, both in the app and by the server.
@@ -71,7 +73,7 @@ What works (tested in a real browser):
 - "Make a new QR code" for a lost phone. The old code stops working.
 - Onboarding a new guild: a platform admin runs `select bootstrap_guild('Guild name', 'slug', 'captain@aalto.fi');`
   in the Supabase SQL editor and sends the returned invite link (`/join/<code>`) to the captain.
-- 28 new database tests (191 total, all pass).
+- 37 new database tests in `07_auth` (200 total, all pass).
 
 Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is really sent).
 
@@ -84,19 +86,34 @@ Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is
   hijack we reproduced: someone password-signs-up the captain's email before the captain's first login.
 - Tutor groups can only be created by the import (slice 5) for now.
 
+## UI: home screens and polish (merged 2026-10-07)
+
+- **Fuksi home = their skill tree**, on real data (`roadmap()`), no schema change. The hub shows points and the
+  ring to the next level; track chips fly to a branch; tap a node for details, double-tap to submit proof.
+  Approvals draw on as neon lines with a chime, reveals unlock keyholes, a new level shows a level-up card.
+  Dock: My QR and Ranks. `/tree` now just redirects to `/`. Check: `node scripts/check-news.mjs`.
+- **Staff home**: one tab per tool, shown by role (Review, Check-in, Ranks, Secrets, People) plus a Projector link.
+- **Smooth tree**: pan/zoom writes the transform straight to the page once per frame (no React re-render per move),
+  the 5 s refresh no longer snaps the view back, and the dot grid sits on its own layer. Measured in Chrome:
+  ~43 ms → ~17 ms per frame (60 fps).
+- Buttons lift on hover and ripple on press; each screen and staff tab slides in. All off under "reduce motion".
+- Who can do what, per role: `docs/fuksipisteet/USER-WORKFLOWS.md`.
+
 ## What you need to do
 
 - [x] Docker + Supabase running locally; all database tests pass.
-- [ ] Ask Data Guild for the roadmap data and the open questions in SDD §9 (mandatory nodes, is 40p required, secret node rules, jäynä points, can we use their artwork).
-- [ ] Decide two small things with the team:
-  - Projector: show one member's map (current) or the whole guild?
-  - Group submissions (submitting for several people at once): the spec has them, slice 1 turns them off. Keep off until later?
-- [ ] After that: open the PR, merge, start slice 2.
+- [x] Get the Data Guild roadmap into the seed.
+- [ ] Ask Data Guild to confirm the seed placeholders (see "Still open") and the SDD §9 questions (can we use their artwork).
+- [ ] Re-run `supabase db reset` + `supabase test db` after the seed change.
+- [ ] Decide with the team: group submissions (submitting for several people at once). The spec has them, slice 1 turns them off. Keep off until later?
+- [x] Merge everything into `main` and delete the merged branches.
+- [ ] Get a teammate's review of what's in `main` (it skipped PRs).
+- [ ] Set up production email + auth hooks (see "Before a real pilot" above).
+- [ ] Start slice 5 import/export.
 
 ## Known gaps, to fix in later slices
 
 - Some tables (`member_codes`, `invites`, `ai_usage`) don't carry `guild_id` + `season_id`. Fix it or write the exception in the SDD.
-- `supabase/config.toml` allows open email+password sign-up. Lock it down in slice 2.
 - No test yet for two people submitting at the same moment.
 - A rejected task can be resubmitted without limit. Decide if that's OK.
 - Duplicate-photo check trusts the hash the phone sends; slice 4 must compute it on the server.
