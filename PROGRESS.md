@@ -98,6 +98,10 @@ Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is
   ~43 ms → ~17 ms per frame (60 fps).
 - Buttons lift on hover and ripple on press; each screen and staff tab slides in. All off under "reduce motion".
 - Who can do what, per role: `docs/fuksipisteet/USER-WORKFLOWS.md`.
+- **Phone layout** (2026-10-07): checked at 375 px (fuksi tree, node card, QR sheet, every staff tab, projector,
+  welcome). Fixed: the top bar was 650 px wide and stretched the whole screen (tree off-centre, logout and zoom
+  buttons off-screen); staff tabs scrolled sideways (Secrets/People/Projector hidden) and now fit as icon + label;
+  welcome cards show two per row. Desktop unchanged. CSS only (`app/globals.css`).
 
 ## What you need to do
 
