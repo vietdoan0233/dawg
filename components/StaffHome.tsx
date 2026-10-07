@@ -2,7 +2,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import type { Me } from "@/lib/useMe";
-import { InvitePanel, RolesPanel } from "./CaptainTools";
+import { InvitePanel, RolesPanel, ImportExportPanel } from "./CaptainTools";
 import { Icon } from "./Icon";
 import { Leaderboard } from "./Leaderboard";
 import { RevealPanel } from "./RevealPanel";
@@ -29,6 +29,13 @@ export function StaffHome({ me, bar }: { me: Me; bar: ReactNode }) {
           <RolesPanel me={me} />
         </>
       ),
+    },
+    {
+      id: "import-export",
+      label: "Import/Export",
+      icon: "download",
+      show: me.role === "captain",
+      body: () => <ImportExportPanel guildId={me.guildId} />,
     },
   ].filter((t) => t.show);
   const [tab, setTab] = useState(tabs[0].id);

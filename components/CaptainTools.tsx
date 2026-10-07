@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { db } from "@/lib/supabase";
 import { friendly } from "@/lib/roadmap";
 import type { Me, Role } from "@/lib/useMe";
@@ -128,5 +128,189 @@ export function RolesPanel({ me }: { me: Me }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+export function ImportExportPanel({ guildId }: { guildId: number }) {
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<Record<string, unknown>[] | null>(null);
+  const [importMapping, setImportMapping] = useState<Record<string, string> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [csvContent, setCsvContent] = useState<string | null>(null);
+
+  const handleImportFile = async (file: File) => {
+    setError(null);
+    setImporting(true);
+    try {
+      const content = await file.text();
+      setCsvContent(content);
+
+      // Step 1: Get mapping preview
+      const response = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guild_id: guildId, csv_content: content }),
+      });
+      const result = (await response.json()) as {
+        status: string;
+        preview?: Record<string, unknown>[];
+        mapping?: Record<string, string>;
+        message?: string;
+      };
+      if (result.status === "error") {
+        setError(result.message || "Import failed");
+      } else {
+        setImportPreview(result.preview || []);
+        setImportMapping(result.mapping || {});
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleApplyImport = async () => {
+    if (!importMapping || !csvContent) return;
+    setError(null);
+    setImporting(true);
+    try {
+      // Step 2: Apply with confirmed mapping
+      const response = await fetch("/api/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          guild_id: guildId,
+          csv_content: csvContent,
+          mapping: importMapping,
+          confirm: true,
+        }),
+      });
+      const result = (await response.json()) as { status: string; message?: string };
+      if (result.status === "error") {
+        setError(result.message || "Import application failed");
+      } else {
+        setError("Import completed successfully!");
+        setImportPreview(null);
+        setImportMapping(null);
+        setCsvContent(null);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import application failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleExport = async () => {
+    setError(null);
+    setExporting(true);
+    try {
+      const response = await fetch("/api/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guild_id: guildId }),
+      });
+      const result = (await response.json()) as { status: string; csv?: string; message?: string };
+      if (result.status === "error") {
+        setError(result.message || "Export failed");
+      } else if (result.csv) {
+        // Download CSV
+        const blob = new Blob([result.csv], { type: "text/csv" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `export-${new Date().toISOString().split("T")[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <>
+      <section className="panel">
+        <h2>Import</h2>
+        <p className="hint">Upload a CSV with categories, tasks, tiers, members, and opening balances.</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv"
+          onChange={(e) => e.target.files?.[0] && void handleImportFile(e.target.files[0])}
+          disabled={importing}
+          style={{ display: "none" }}
+        />
+        <button
+          type="button"
+          className="primary"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={importing || !!importPreview}
+        >
+          {importing ? "Processing..." : "Choose CSV file"}
+        </button>
+        {error && <p className="error">{error}</p>}
+        {importPreview && (
+          <>
+            <h3>Preview</h3>
+            <p className="hint">Column mapping detected by AI. Review before applying.</p>
+            <div style={{ overflowX: "auto", marginBottom: "1rem" }}>
+              <table style={{ fontSize: "0.875rem" }}>
+                <thead>
+                  <tr>
+                    {Object.keys(importPreview[0] || {}).map((k) => (
+                      <th key={k}>{k}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {importPreview.map((row, i) => (
+                    <tr key={i}>
+                      {Object.values(row).map((v, j) => (
+                        <td key={j}>{String(v)}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <details style={{ marginBottom: "1rem" }}>
+              <summary>Detected column mapping</summary>
+              <pre style={{ fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>{JSON.stringify(importMapping, null, 2)}</pre>
+            </details>
+            <button type="button" className="primary" onClick={handleApplyImport} disabled={importing}>
+              {importing ? "Applying..." : "Apply import"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setImportPreview(null);
+                setImportMapping(null);
+                setCsvContent(null);
+                if (fileInputRef.current) fileInputRef.current.value = "";
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>Export</h2>
+        <p className="hint">Download current roster as member × category matrix with tiers.</p>
+        <button type="button" className="primary" onClick={handleExport} disabled={exporting}>
+          {exporting ? "Generating..." : "Download CSV"}
+        </button>
+      </section>
+    </>
   );
 }

@@ -12,7 +12,7 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 | 2. Auth & hardening | Real email login, invites, roles, more security tests | **Done**, in `main`. Needs production email + auth hooks before a pilot |
 | 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype**, in `main`. See shortcuts below |
 | 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype**, in `main`. No 30-day purge, the server doesn't compute the photo hash |
-| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal done**, **UI polish done** (see below). Import/export **not started** |
+| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal done**, **UI polish done**. Import/export **in progress** (migration 0004, Edge Functions, captain UI scaffolding added) |
 | UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
 **Next up:** slice 5 import/export, then hardening the slice 3–4 prototypes (see the shortcut list).
