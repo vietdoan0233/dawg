@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { db } from "@/lib/supabase";
 import { friendly } from "@/lib/roadmap";
+import { Icon } from "./Icon";
 
 type Secret = { id: number; title: string };
 
@@ -35,14 +36,17 @@ export function RevealPanel({ guildId }: { guildId: number }) {
   if (!secrets?.length && !error) return null;
   return (
     <section className="panel">
-      <h2>🔒 Secret nodes</h2>
+      <h2>
+        <Icon name="keyhole" /> Secret nodes
+      </h2>
+      <p className="hint">Revealing unlocks the node on every phone and the projector within 5 seconds.</p>
       {error && <p className="error">{error}</p>}
       <ul className="queue">
         {secrets?.map((s) => (
           <li key={s.id} className="row">
             <span className="grow">{s.title}</span>
             <button type="button" className="primary" onClick={() => void reveal(s.id)}>
-              Reveal
+              <Icon name="sparkle" /> Reveal
             </button>
           </li>
         ))}

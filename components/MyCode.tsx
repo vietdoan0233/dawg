@@ -8,14 +8,13 @@ export function MyCode({ guildId }: { guildId: number }) {
   const [img, setImg] = useState<string | null>(null);
   const [code, setCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!open || code) return;
+    if (code) return;
     db()
       .rpc("my_code", { p_guild_id: guildId })
       .then(({ data, error }) => (error || !data ? setError(error?.message ?? "No code yet.") : setCode(data)));
-  }, [open, code, guildId]);
+  }, [code, guildId]);
 
   useEffect(() => {
     if (code) QRCode.toDataURL(code, { width: 280, margin: 2 }).then(setImg, (e: Error) => setError(e.message));
@@ -30,14 +29,11 @@ export function MyCode({ guildId }: { guildId: number }) {
 
   return (
     <section className="mycode">
-      <button type="button" className="primary" onClick={() => setOpen(!open)}>
-        {open ? "Hide my QR" : "Show my QR"}
-      </button>
-      {open && error && <p className="error">{error}</p>}
+      {error && <p className="error">{error}</p>}
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL, nothing to optimise */}
-      {open && img && <img src={img} alt="My check-in QR code" width={280} height={280} />}
-      {open && code && <p className="hint">Code: <code>{code}</code></p>}
-      {open && code && (
+      {img && <img src={img} alt="My check-in QR code" width={280} height={280} />}
+      {code && <p className="hint">Code: <code>{code}</code></p>}
+      {code && (
         <button type="button" onClick={() => void rotate()}>
           Lost your phone or shared the code? Make a new one
         </button>

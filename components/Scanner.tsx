@@ -26,11 +26,11 @@ const save = (key: string, q: Scan[]) => {
 };
 
 const LABEL: Record<string, string> = {
-  ok: "✅ Checked in",
-  duplicate: "↩️ Already checked in",
-  limit_reached: "⛔ Node already full for this fuksi",
-  unknown: "❓ Unknown code",
-  outside_window: "🕒 Outside the event time",
+  ok: "Checked in",
+  duplicate: "Already checked in",
+  limit_reached: "Node already full for this fuksi",
+  unknown: "Unknown code",
+  outside_window: "Outside the event time",
 };
 
 type Detector = { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
@@ -89,7 +89,7 @@ export function Scanner({ guildId, memberId }: { guildId: number; memberId: numb
           // offline, expired login or server down: keep it queued and retry later
           if (error && (!error.code || status === 401 || status >= 500 || error.code === "28000")) return;
           save(key, load(key).filter((s) => s.id !== scan.id));
-          const text = error ? `⚠️ ${friendly(error.message)}` : (LABEL[data] ?? data);
+          const text = error ? friendly(error.message) : (LABEL[data] ?? data);
           setResults((r) => [{ id: scan.id, text, ok: data === "ok" }, ...r].slice(0, 20));
         }
       } while (again.current);
@@ -175,7 +175,7 @@ export function Scanner({ guildId, memberId }: { guildId: number; memberId: numb
         </select>
       </label>
       <button type="button" className="primary" disabled={!eventId} onClick={toggleCamera}>
-        {camera ? "Stop camera" : "📷 Scan QR"}
+        {camera ? "Stop camera" : "Scan QR with camera"}
       </button>
       {camera && <video ref={video} className="camera" muted playsInline />}
       <form

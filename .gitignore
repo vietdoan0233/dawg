@@ -12,3 +12,6 @@ next-env.d.ts
 
 # agent git worktrees (each is its own checkout)
 .claude/worktrees/
+
+# reference screenshot of a commercial game: not ours to publish
+design_skill_tree.png
