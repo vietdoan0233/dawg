@@ -8,6 +8,8 @@ Guilds track fuksi points (tasks + events → teekkari cap at Wappu) in messy Go
 
 ## Run it locally
 
+**Not a developer?** Follow the step-by-step guide: [`docs/HOW-TO-RUN.md`](docs/HOW-TO-RUN.md).
+
 Needs Git, Node 22+ and Docker Desktop (running).
 
 ```bash
