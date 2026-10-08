@@ -59,7 +59,7 @@ Known prototype shortcuts (fix before a real pilot):
 - ~~QR codes never change~~: fixed in slice 2 (`rotate_my_code`, "Make a new QR code").
 - Any tutor can check in any fuksi in the guild, not only their own group. Probably fine; confirm with the team.
 - ~~The check-in time the phone reports is checked but not saved~~: fixed in `slice/3-4-hardening` (kept as `reviewed_at`).
-- Photos are uploaded as-is: the SDD's canvas re-encode (≤1600 px, strips EXIF/GPS) is not built yet.
+- ~~Photos are uploaded as-is~~: fixed in `slice/3-4-hardening` (the phone redraws each photo as a JPEG ≤1600 px, so EXIF/GPS never leaves it).
 
 ## Slices 3–4 hardening (branch `slice/3-4-hardening`, built 2026-10-08)
 

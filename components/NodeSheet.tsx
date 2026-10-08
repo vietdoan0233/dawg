@@ -17,6 +17,26 @@ export const nodeStatus = (node: OpenNode) =>
   (node.max_repeats > 1 ? ` · ${node.approved}/${node.max_repeats}` : "") +
   ` · reviewed by ${node.reviewer}`;
 
+// SDD: redraw the photo on a canvas as a JPEG, longest side ≤1600 px. The canvas copies only pixels,
+// so EXIF (GPS, device, time) never leaves the phone. Orientation is applied before it is dropped.
+async function reencode(file: File): Promise<Blob> {
+  const img = await createImageBitmap(file, { imageOrientation: "from-image" }).catch(() => {
+    throw new Error("Could not read this photo. Try a JPEG, PNG or WebP.");
+  });
+  const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const g = canvas.getContext("2d")!;
+  g.fillStyle = "#fff"; // JPEG has no alpha: transparent PNG/WebP areas would turn black
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.drawImage(img, 0, 0, canvas.width, canvas.height);
+  img.close();
+  const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, "image/jpeg", 0.85));
+  if (!blob) throw new Error("Could not read this photo. Try another one.");
+  return blob;
+}
+
 // Node details + the evidence form in one sheet. Photo and note are optional unless the node itself
 // requires them (tasks.requires_photo / requires_note, enforced again by submit_task). Submit is never
 // greyed out: a missing required field is explained next to that field instead.
@@ -52,7 +72,9 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
         // the one direct client write (ARCHITECTURE-SIMPLE.md rule 1): into the caller's own <guild>/<member>/ folder.
         // No hash from the phone: the purge-photos job hashes the stored file for the duplicate flag.
         path = `${me.guildId}/${me.memberId}/${crypto.randomUUID()}`;
-        const up = await db().storage.from("proofs").upload(path, photo, { contentType: photo.type });
+        const jpeg = await reencode(photo).catch((e: Error) => e);
+        if (jpeg instanceof Error) return setError({ field: "photo", text: jpeg.message });
+        const up = await db().storage.from("proofs").upload(path, jpeg, { contentType: "image/jpeg" });
         if (up.error) return setError({ field: "photo", text: up.error.message });
       }
       const { error } = await db().rpc("submit_task", {
