@@ -11,11 +11,11 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 | 1. Walking skeleton | Demo login → fuksi sees their map → submits a task → tutor approves → node lights up → projector shows it | **Done**, in `main`. Seed now holds the real Data Guild map (55 nodes); a few values still unconfirmed |
 | 2. Auth & hardening | Real email login, invites, roles, more security tests | **Done**, in `main`. Needs production email + auth hooks before a pilot |
 | 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Hardened** on branch `slice/3-4-hardening`: scan time saved for audit, replay tests. See shortcuts below |
-| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Hardened** on branch `slice/3-4-hardening`: 30-day purge, server-side hash + duplicate flag, upload quota |
+| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Hardened** on branch `slice/3-4-hardening`: 30-day purge, server-side hash + duplicate flag, upload quota, photos re-encoded on the phone (EXIF/GPS stripped) |
 | 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Done** on branch `slice/5-import-export-finish`: roster import (AI column mapping, headers only), results export, reveal, UI polish |
 | UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
-**Next up:** teammate review of `slice/5-import-export-finish` and `slice/3-4-hardening` (draft PR), then merge.
+**Next up:** a teammate reviews PR #2 (slice 5) and PR #3 (slices 3–4, includes #2), then merge #2 and #3 into `main`. All 5 slices are built; the sanitizer check passed (2026-10-08).
 
 Slices 1–4 prototypes and the UI are merged into `main`; they went in without PRs.
 Database tests: 9 files, 241/241 pass on `slice/3-4-hardening` (`supabase db reset` + `supabase test db`, 2026-10-08).
@@ -164,7 +164,7 @@ The AI call itself was not exercised locally (no key here); the no-key fallback 
 - [x] Merge everything into `main` and delete the merged branches.
 - [ ] Get a teammate's review of what's in `main` (it skipped PRs).
 - [ ] Set up production email + auth hooks (see "Before a real pilot" above).
-- [ ] **Slice 5**: teammate review of `slice/5-import-export-finish`, then merge. Set `ANTHROPIC_API_KEY` as a function secret.
+- [ ] **Slices 3–5**: teammate review of PR #2 and PR #3, then merge. Set `ANTHROPIC_API_KEY` as a function secret.
 
 ## Known gaps, to fix in later slices
 
