@@ -164,7 +164,7 @@ export function FuksiHome({ me, bar }: { me: Me; bar: ReactNode }) {
           ) : (
             <>
               <Levels map={map} />
-              <h3 className="section-title">Tutor groups</h3>
+              <h3 className="section-title">Leaderboard</h3>
               <Leaderboard guildId={me.guildId} />
             </>
           )}

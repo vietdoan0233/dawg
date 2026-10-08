@@ -1,9 +1,9 @@
 -- Slice 1 flow: submit -> review -> roadmap -> leaderboard, secret nodes, tiers (SDD §3-§6).
--- Guild-agnostic: the demo users supply members and tutor groups; every category, node, tier and rule
+-- Guild-agnostic: the demo users supply members; every category, node, tier and rule
 -- used here is a generic fixture created below, so replacing the demo dataset cannot break this file.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(58);
+select plan(59);
 
 -- ---------- fixtures (as table owner) ----------
 select set_config('t.g', (select guild_id::text from members where display_name = 'Demo Captain'), true);
@@ -100,9 +100,9 @@ select is((select count(*) from jsonb_array_elements(public.roadmap(current_sett
           'roadmap() shows the hidden node as a locked placeholder without title or points');
 -- Slice 1 is self-submission only: the signature keeps with_member_ids, a non-empty array is refused
 select throws_ok(format('select public.submit_task(%s, null, null, null, array[%s])', current_setting('t.range'), current_setting('t.f3')),
-                 '0A000', 'group_submit_unsupported', 'group submission is refused (member of another group)');
+                 '0A000', 'group_submit_unsupported', 'group submission is refused (fuksi 3)');
 select throws_ok(format('select public.submit_task(%s, null, null, null, array[%s])', current_setting('t.range'), current_setting('t.f2')),
-                 '0A000', 'group_submit_unsupported', 'group submission is refused (group mate)');
+                 '0A000', 'group_submit_unsupported', 'group submission is refused (fuksi 2)');
 select set_config('t.range1s', public.submit_task(current_setting('t.range')::bigint)::text, true);
 
 -- ---------- fuksi 2: isolation ----------
@@ -115,27 +115,31 @@ select is((select count(*) from public.submissions where member_id = current_set
 select throws_ok(format('select * from public.review_submissions(array[%s], true)', current_setting('t.sub1')),
                  '42501', 'forbidden', 'a fuksi cannot review');
 
--- ---------- tutor B (other group) ----------
+-- ---------- tutor B: no tutor groups (v4), every tutor reviews every fuksi of the guild ----------
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000003', true);
 set local role authenticated;
-select is((select count(*) from public.submissions), 0::bigint, 'a tutor sees no submissions outside their group');
-select throws_ok(format('select * from public.review_submissions(array[%s], true)', current_setting('t.sub1')),
-                 '42501', 'forbidden', 'a tutor cannot review another group');
+select ok((select count(*) from public.submissions where member_id = current_setting('t.f1')::bigint) >= 4,
+          'any tutor of the guild sees fuksi 1''s submissions');
+select is((select result from public.review_submissions(
+            array[(select id from public.submissions where task_id = current_setting('t.note')::bigint)], false)),
+          'rejected', 'tutor B can review fuksi 1');
 
 -- ---------- tutor A: review ----------
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', true);
 set local role authenticated;
-select ok((select count(*) from public.submissions where status = 'pending') >= 4, 'a tutor sees their group''s pending submissions');
+select ok((select count(*) from public.submissions where status = 'pending') >= 4, 'a tutor sees the guild''s pending submissions');
 select is((select result from public.review_submissions(array[current_setting('t.sub1')::bigint], true)), 'ok',
           'approve defaults to points_min and lights the node');
-select throws_ok(format('select * from public.review_submissions(array[%s], true)', current_setting('t.sub1')),
-                 '22023', 'not_pending', 'only pending rows are reviewable');
-select throws_ok(format('select * from public.review_submissions(array[%s], false)', current_setting('t.sub1')),
-                 '22023', 'not_pending', 'a stale reject of an approved row raises instead of reporting rejected');
+select is((select result from public.review_submissions(array[current_setting('t.sub1')::bigint], true)), 'already_reviewed',
+          'only pending rows are reviewable: a re-approve reports already_reviewed');
+select is((select result from public.review_submissions(array[current_setting('t.sub1')::bigint], false)), 'already_reviewed',
+          'a stale reject of an approved row reports already_reviewed, not rejected');
 select is((select status from public.submissions where id = current_setting('t.sub1')::bigint), 'approved',
           'and the approved row is untouched');
+select is((select points_awarded from public.submissions where id = current_setting('t.sub1')::bigint), 2,
+          'with its original points');
 select throws_ok('select * from public.review_submissions(array[999999], true)', '42501', 'forbidden',
                  'an unknown submission id looks like an unauthorised one');
 select is((select points_awarded from public.submissions where id = current_setting('t.sub1')::bigint), 2,
@@ -181,12 +185,10 @@ select is((select n ->> 'status' from jsonb_array_elements(public.roadmap(curren
 select is((public.roadmap(current_setting('t.g')::bigint) ->> 'total')::int, 2 + 2 + 7, 'roadmap total sums approved points');
 select is((select (c ->> 'points')::int from jsonb_array_elements(public.roadmap(current_setting('t.g')::bigint) -> 'categories') c
             where c ->> 'name' = 'Cat A'), 11, 'category progress uses the snapshotted category');
-select is((select total_points from public.leaderboard(current_setting('t.g')::bigint) l
-            join public.tutor_groups g on g.id = l.group_id where g.id = (select tutor_group_id from public.members where id = current_setting('t.f1')::bigint)),
-          11::bigint, 'leaderboard shows the tutor-group total');
-select is((select total_points from public.leaderboard(current_setting('t.g')::bigint) l
-            where l.group_id = (select tutor_group_id from public.members where id = current_setting('t.f3')::bigint)),
-          0::bigint, 'leaderboard includes groups with no points');
+select is((select total from public.leaderboard(current_setting('t.g')::bigint) where member_id = current_setting('t.f1')::bigint),
+          11, 'leaderboard shows fuksi 1''s individual total');
+select is((select total from public.leaderboard(current_setting('t.g')::bigint) where member_id = current_setting('t.f3')::bigint),
+          0, 'leaderboard includes fuksis with no points');
 
 -- ---------- secret nodes: owner sees after check-in; everyone after reveal ----------
 reset role;
@@ -255,17 +257,18 @@ select is((select count(*) from public.member_tier where member_id = current_set
           'an unfinished required node removes the level');
 select is(public.required_missing(current_setting('t.f3')::bigint), true, 'the captain sees an outstanding required node');
 reset role;
-select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000003', true);   -- tutor B: f3's tutor
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000003', true);   -- tutor B
 set local role authenticated;
-select is(public.required_missing(current_setting('t.f3')::bigint), true, 'the member''s own tutor sees it');
+select is(public.required_missing(current_setting('t.f3')::bigint), true, 'a tutor of the guild sees it');
 reset role;
-select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', true);   -- tutor A: other group
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', true);   -- tutor A
 set local role authenticated;
-select is(public.required_missing(current_setting('t.f3')::bigint), false, 'another group''s tutor learns nothing');
+select is(public.required_missing(current_setting('t.f3')::bigint), true, 'tutor A does learn it too (no groups, v4)');
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000004', true);   -- fuksi 1
 set local role authenticated;
-select is(public.required_missing(current_setting('t.f3')::bigint), false, 'a fuksi cannot probe another member''s progress');
+select is(public.required_missing(current_setting('t.f3')::bigint), true,
+          'levels are public in the guild, so another fuksi learns it as well (v4)');
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000006', true);   -- f3 itself
 set local role authenticated;

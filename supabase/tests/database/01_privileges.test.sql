@@ -1,7 +1,7 @@
 -- Privileges + RLS contract (SDD §3, §5). Runs after seed.sql (`supabase test db`).
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(26);
 
 -- the demo guild is found through the demo users; no assertion depends on its names or contents
 select set_config('t.dg', (select guild_id::text from members where display_name = 'Demo Captain'), true);
@@ -56,6 +56,13 @@ select ok(has_function_privilege('authenticated', 'public.submit_task(bigint,tex
           and has_function_privilege('authenticated', 'public.roadmap(bigint)', 'EXECUTE')
           and has_function_privilege('authenticated', 'public.leaderboard(bigint)', 'EXECUTE'),
           'slice-1 RPCs are executable by authenticated');
+
+select ok(has_function_privilege('authenticated', 'public.activity(bigint,int)', 'EXECUTE')
+          and has_function_privilege('authenticated', 'public.set_role(bigint,text)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.activity(bigint,int)', 'EXECUTE')
+          and not has_function_privilege('anon', 'public.set_role(bigint,text)', 'EXECUTE')
+          and to_regprocedure('public.set_role(bigint,text,bigint)') is null,
+          'v4 signatures: activity and set_role(bigint,text) for authenticated only; the 3-argument set_role is gone');
 
 select ok(exists (select 1 from pg_indexes where schemaname = 'public' and tablename = 'submissions'
                    and indexdef like '%(member_id, task_id)%'),

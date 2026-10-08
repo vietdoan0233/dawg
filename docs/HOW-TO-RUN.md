@@ -99,12 +99,12 @@ Pick a person under **"Choose your character"** to try the app as a fuksi, tutor
 
 ### Optional: fill the app with a crowd (good for a pitch)
 
-Out of the box only 3 fuksis exist, so the leaderboard looks empty. To add 48 made-up fuksis in 6 tutor groups, with
+Out of the box only 3 fuksis exist, so the leaderboard looks empty. To add 48 made-up fuksis to the live leaderboard, with
 5 weeks of approved proofs, check-ins and proofs waiting for review, open a **second** terminal in the app folder and run:
 ```
 npm run demo:crowd
 ```
-It prints the tutor-group scores when it is done. Nobody in the crowd is a real person. To remove the crowd, run
+It prints the top of the leaderboard when it is done. Nobody in the crowd is a real person. To remove the crowd, run
 `npx supabase db reset`.
 
 ---

@@ -1,0 +1,107 @@
+/* SkillTree styles (moved out of app/globals.css, SDD §11.5 fix 6) */
+.tree-shell { position: relative; min-height: 0; overflow: hidden; }
+/* the dot grid sits on its own static layer: painted on the viewport itself, it repainted with every pan frame */
+.tree-shell::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, rgb(232 184 74 / 0.09) 1px, transparent 1.6px) 0 0 / 30px 30px;
+}
+.tree-viewport { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; cursor: grab; }
+.tree-viewport:active { cursor: grabbing; }
+/* hidden until SkillTree paints the first view; GPU layer only while moving, so resting text re-renders sharp */
+.tree-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; visibility: hidden; }
+.tree-world.moving, .tree-world.flying { will-change: transform; }
+.tree-world.flying { transition: transform 0.6s var(--ease-out); }
+
+.tree-edges { position: absolute; width: 1px; height: 1px; overflow: visible; }
+/* unlit: a dark, unpowered tube. lit: a solid neon tube (white-hot core + coloured glow) = your progress */
+.tree-edges path { fill: none; stroke-linecap: round; }
+.tree-edges path.base { stroke: color-mix(in oklab, var(--c) 28%, #2b241d); stroke-width: 3; }
+.tree-edges path.neon { stroke: color-mix(in oklab, var(--c), white 60%); stroke-width: 4; }
+/* the glow is a wide translucent stroke under the core, not drop-shadow filters (those re-rasterise on every repaint) */
+.tree-edges path.neon.halo { stroke: var(--c); stroke-width: 13; stroke-opacity: 0.4; }
+/* a freshly approved line powers up: it draws on from the parent node, then flickers like a neon tube striking */
+.tree-edges path.neon.draw {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: draw 0.7s cubic-bezier(0.6, 0, 0.4, 1) var(--delay) forwards, flicker 0.6s linear calc(var(--delay) + 0.7s);
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes flicker { 0% { opacity: 1; } 12% { opacity: 0.3; } 24% { opacity: 1; } 40% { opacity: 0.55; } 55%, 100% { opacity: 1; } }
+
+.tree-hub { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); }
+
+.tree-banner {
+  position: absolute; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  padding: 8px 14px; border-radius: 999px; font-family: var(--font-display); font-weight: 700;
+  border: 1px solid color-mix(in oklab, var(--c), white 25%); color: color-mix(in oklab, var(--c), white 45%);
+  background: color-mix(in oklab, var(--c) 18%, var(--bg));
+}
+.tree-banner b { font-family: var(--font-body); color: var(--fg); font-variant-numeric: tabular-nums; }
+
+/* node: the dot's centre sits exactly on its position (translate by half the 60px dot) */
+.tree-node {
+  --c-hi: color-mix(in oklab, var(--c), white 40%);
+  position: absolute; width: 124px; transform: translate(-50%, -30px);
+  display: grid; justify-items: center; gap: 4px; min-height: 0; padding: 0;
+  border: 0; background: none; border-radius: 0; color: inherit; font-size: 13px; cursor: pointer;
+}
+div.tree-node { cursor: default; }
+.tree-node:hover { border: 0; }
+.tree-node:active { transform: translate(-50%, -30px); }
+.tree-dot {
+  position: relative; display: grid; place-items: center; width: 60px; height: 60px; border-radius: 50%;
+  border: 3px solid color-mix(in oklab, var(--c-hi) 65%, var(--line)); background: radial-gradient(circle at 50% 30%, #2a221b, #17120e);
+  color: var(--c-hi); transition: transform 0.18s var(--ease-out), box-shadow 0.25s;
+}
+.tree-label { max-width: 124px; text-align: center; line-height: 1.2; font-weight: 500; text-shadow: 0 1px 3px var(--bg), 0 0 8px var(--bg); }
+.tree-pts { font-size: 11px; padding: 0 7px; border-radius: 999px; color: var(--muted); background: rgb(18 15 12 / 0.8); border: 1px solid var(--line); }
+.tree-pips { display: flex; gap: 3px; }
+.tree-pips i { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); }
+.tree-pips i.half { border-color: var(--wait); background: linear-gradient(90deg, var(--wait) 50%, transparent 50%); }
+.tree-pips i.on { background: var(--c-hi); border-color: var(--c-hi); }
+.tree-viewport.far .tree-label, .tree-viewport.far .tree-pts, .tree-viewport.far .tree-pips { visibility: hidden; }
+
+@media (hover: hover) {
+  button.tree-node:hover .tree-dot { transform: scale(1.12); box-shadow: 0 0 0 6px color-mix(in oklab, var(--c) 25%, transparent); }
+}
+.tree-node:focus-visible { outline: none; }
+.tree-node:focus-visible .tree-dot { outline: 3px solid var(--gold); outline-offset: 4px; }
+
+.tree-node.lit .tree-dot {
+  border-color: var(--c-hi); background: radial-gradient(circle at 50% 30%, color-mix(in oklab, var(--c), white 25%), var(--c));
+  color: var(--on); box-shadow: 0 0 22px color-mix(in oklab, var(--c) 75%, transparent);
+}
+.tree-node.lit .tree-label { color: var(--fg); }
+.tree-node.pending .tree-dot { border-style: dashed; border-color: var(--wait); }
+/* the waiting pulse is its own ring animating only transform + opacity (compositor), so it never repaints the world */
+.tree-node.pending::after {
+  content: ""; position: absolute; z-index: -1; left: 50%; top: 0; width: 60px; height: 60px; margin-left: -30px; border-radius: 50%;
+  box-shadow: 0 0 0 7px rgb(251 191 36 / 0.18); opacity: 0; transform: scale(0.88); pointer-events: none;
+  animation: wait 1.8s ease-in-out infinite;
+}
+@keyframes wait { 50% { opacity: 1; transform: scale(1); } }
+.tree-badge { position: absolute; right: -4px; top: -4px; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--bg); }
+.tree-badge.done { background: var(--gold); color: var(--gold-ink); }
+.tree-badge.wait { background: var(--wait); color: var(--gold-ink); }
+.tree-node.locked .tree-dot { border: 3px dashed var(--secret); color: var(--secret); background: radial-gradient(circle, #2a1f40, #140f1d); box-shadow: 0 0 18px rgb(183 148 246 / 0.25); }
+.tree-node.locked .tree-label { color: var(--secret); letter-spacing: 0.2em; }
+
+/* burst: a node that just lit up (when its neon line arrives: --delay) or unlocked ignites, rings out and
+   throws sparks. Plays once per mount; until --delay it still looks unlit. */
+.tree-node.burst .tree-dot { animation: ignite 0.8s cubic-bezier(0.3, 1.6, 0.5, 1) var(--delay, 0s) both; }
+.tree-node.burst .tree-dot::before {
+  content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 3px solid var(--c-hi); pointer-events: none;
+  animation: ring-out 1s ease-out var(--delay, 0s) both;
+}
+.tree-node.burst .tree-dot::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 -44px 0 var(--gold-2), 31px -31px 0 var(--c-hi), 44px 0 0 var(--gold-2), 31px 31px 0 var(--c-hi),
+              0 44px 0 var(--gold-2), -31px 31px 0 var(--c-hi), -44px 0 0 var(--gold-2), -31px -31px 0 var(--c-hi);
+  animation: sparks 0.9s ease-out var(--delay, 0s) both;
+}
+@keyframes ignite { 0% { filter: grayscale(1) brightness(0.55); transform: scale(1); } 40% { filter: none; transform: scale(1.35); } 100% { transform: scale(1); } }
+@keyframes ring-out { 0% { transform: scale(1); opacity: 0; } 8% { opacity: 1; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes sparks { 0% { transform: scale(0.3); opacity: 0; } 8% { opacity: 1; } 100% { transform: scale(1.9); opacity: 0; } }
+.tree-node.selected .tree-dot { outline: 3px solid var(--gold); outline-offset: 5px; }
+
+.tree-controls { position: absolute; right: 12px; bottom: 96px; display: grid; gap: 8px; z-index: 2; }
+.tree-controls button { width: 46px; height: 46px; padding: 0; border-radius: 50%; background: rgb(30 25 21 / 0.92); box-shadow: 0 6px 16px rgb(0 0 0 / 0.35); }

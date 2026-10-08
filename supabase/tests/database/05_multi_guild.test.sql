@@ -27,12 +27,9 @@ create function pg_temp.task(n int, p_cat bigint, p_title text, lo int, hi int) 
 create function pg_temp.tier(n int, p_name text, p_min int) returns bigint language sql as $$
   insert into tiers (guild_id, season_id, name, min_total)
   values (current_setting('t.g' || n)::bigint, current_setting('t.s' || n)::bigint, p_name, p_min) returning id $$;
-create function pg_temp.grp(n int, p_name text) returns bigint language sql as $$
-  insert into tutor_groups (guild_id, season_id, name)
-  values (current_setting('t.g' || n)::bigint, current_setting('t.s' || n)::bigint, p_name) returning id $$;
-create function pg_temp.member(n int, p_user uuid, p_email text, p_name text, p_role text, p_grp bigint) returns bigint language sql as $$
-  insert into members (guild_id, season_id, user_id, email, display_name, role, tutor_group_id)
-  values (current_setting('t.g' || n)::bigint, current_setting('t.s' || n)::bigint, p_user, p_email, p_name, p_role, p_grp) returning id $$;
+create function pg_temp.member(n int, p_user uuid, p_email text, p_name text, p_role text) returns bigint language sql as $$
+  insert into members (guild_id, season_id, user_id, email, display_name, role)
+  values (current_setting('t.g' || n)::bigint, current_setting('t.s' || n)::bigint, p_user, p_email, p_name, p_role) returning id $$;
 
 -- ---------- two guilds with different structures ----------
 do $$
@@ -63,12 +60,10 @@ begin
                                           'Track task', 1, 2)::text, true);
   perform pg_temp.tier(2, 'Level X', 100);
 
-  perform set_config('t.gr1', pg_temp.grp(1, 'Gr1')::text, true);
-  perform set_config('t.gr2', pg_temp.grp(2, 'Gr2')::text, true);
-  perform set_config('t.m1', pg_temp.member(1, '00000000-0000-4000-8000-0000000000b1', 'mg.shared@demo.invalid', 'Shared fuksi', 'fuksi', current_setting('t.gr1')::bigint)::text, true);
-  perform pg_temp.member(2, '00000000-0000-4000-8000-0000000000b1', 'mg.shared@demo.invalid', 'Shared fuksi', 'fuksi', current_setting('t.gr2')::bigint);
-  perform pg_temp.member(1, '00000000-0000-4000-8000-0000000000b2', 'mg.captain.one@demo.invalid', 'Captain one', 'captain', null);
-  perform pg_temp.member(2, '00000000-0000-4000-8000-0000000000b3', 'mg.captain.two@demo.invalid', 'Captain two', 'captain', null);
+  perform set_config('t.m1', pg_temp.member(1, '00000000-0000-4000-8000-0000000000b1', 'mg.shared@demo.invalid', 'Shared fuksi', 'fuksi')::text, true);
+  perform set_config('t.m2', pg_temp.member(2, '00000000-0000-4000-8000-0000000000b1', 'mg.shared@demo.invalid', 'Shared fuksi', 'fuksi')::text, true);
+  perform pg_temp.member(1, '00000000-0000-4000-8000-0000000000b2', 'mg.captain.one@demo.invalid', 'Captain one', 'captain');
+  perform pg_temp.member(2, '00000000-0000-4000-8000-0000000000b3', 'mg.captain.two@demo.invalid', 'Captain two', 'captain');
 end $$;
 
 select is((select count(*) from categories where name = 'Shared'), 2::bigint, 'two guilds may use the same category name');
@@ -123,10 +118,10 @@ set local role authenticated;
 select is((public.roadmap(current_setting('t.g1')::bigint) ->> 'own_tier_id')::bigint, current_setting('t.bronze')::bigint,
           '5p with the minimum met reaches guild 1''s Bronze');
 select is(public.roadmap(current_setting('t.g2')::bigint) ->> 'own_tier_id', null, 'and no level in guild 2');
-select is((select total_points from public.leaderboard(current_setting('t.g1')::bigint) where group_id = current_setting('t.gr1')::bigint),
-          5::bigint, 'guild 1 leaderboard counts guild 1 points');
-select is((select total_points from public.leaderboard(current_setting('t.g2')::bigint) where group_id = current_setting('t.gr2')::bigint),
-          0::bigint, 'guild 2 leaderboard is separate');
+select is((select total from public.leaderboard(current_setting('t.g1')::bigint) where member_id = current_setting('t.m1')::bigint),
+          5, 'guild 1 leaderboard counts guild 1 points');
+select is((select array_agg(member_id::text || ':' || total) from public.leaderboard(current_setting('t.g2')::bigint)),
+          array[current_setting('t.m2') || ':0'], 'guild 2 leaderboard has only its own fuksi, none of guild 1''s members');
 
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000b3', true);   -- captain of guild 2 only

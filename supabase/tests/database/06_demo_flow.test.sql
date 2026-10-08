@@ -28,6 +28,14 @@ select guild_id, season_id, id, v.e, now() + v.s::interval, now() + v.en::interv
                       ('Fx open', 'Fx past', '-10 hours', '-5 hours'),
                       ('Fx secret', 'Fx secret live', '-1 hour', '1 hour')) v(task, e, s, en)
  where title = v.task;
+
+-- a tutor of ANOTHER guild (v4: no tutor groups, so "another group's tutor" became this)
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000c1', 'xg.tutor@demo.invalid');
+with g as (insert into guilds (name, slug) values ('Elsewhere Guild', 'elsewhere-guild') returning id),
+     s as (insert into seasons (guild_id, name, starts_on, ends_on, is_current)
+           select id, 'x', '2026-09-01', '2027-05-31', true from g returning guild_id, id)
+insert into members (guild_id, season_id, user_id, email, display_name, role)
+select guild_id, id, '00000000-0000-4000-8000-0000000000c1', 'xg.tutor@demo.invalid', 'Elsewhere Tutor', 'tutor' from s;
 select set_config('t.live', (select id::text from events where title = 'Fx live'), true);
 select set_config('t.live2', (select id::text from events where title = 'Fx live 2'), true);
 select set_config('t.past', (select id::text from events where title = 'Fx past'), true);
@@ -97,14 +105,14 @@ select is((select count(*) from submissions where member_id = current_setting('t
               and status = 'approved' and points_awarded = 2 and reviewed_by = (select id from members where display_name = 'Demo Organizer')),
           2::bigint, 'check-ins are approved at points_min with the scanner as reviewer');
 
--- ---------- photo visibility: tutor B (other group) vs tutor A (fuksi 1's tutor) ----------
-select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000003', true);
+-- ---------- photo visibility: a tutor of another guild vs a tutor of this guild ----------
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000c1', true);
 set local role authenticated;
-select is((select count(*) from storage.objects where bucket_id = 'proofs'), 0::bigint, 'another group''s tutor cannot see the photo');
+select is((select count(*) from storage.objects where bucket_id = 'proofs'), 0::bigint, 'a tutor of another guild cannot see the photo');
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', true);
 set local role authenticated;
-select is((select count(*) from storage.objects where bucket_id = 'proofs'), 1::bigint, 'the member''s tutor can see the photo');
+select is((select count(*) from storage.objects where bucket_id = 'proofs'), 1::bigint, 'a tutor of the fuksi''s guild can see the photo');
 reset role;
 
 -- ---------- reveal ----------

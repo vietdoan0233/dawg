@@ -12,7 +12,6 @@ do $seed$
 declare
   g bigint; s bigint;
   c_mandatory bigint; c_work bigint; c_party bigint; c_culture bigint; c_guild bigint; c_other bigint;
-  grp_a bigint; grp_b bigint;
 begin
   -- fail safe: the demo users share a known password, so never seed a database that holds anything
   if exists (select 1 from public.guilds) or exists (select 1 from auth.users where email not like '%@demo.invalid') then
@@ -170,9 +169,7 @@ begin
   select g, s, t.id, t.title, now() - interval '1 hour', now() + interval '60 days'
     from tasks t where t.guild_id = g and t.title in ('Captain''s Party', 'Sitsit');
 
-  -- Demo roster
-  insert into tutor_groups (guild_id, season_id, name) values (g, s, 'Group A') returning id into grp_a;
-  insert into tutor_groups (guild_id, season_id, name) values (g, s, 'Group B') returning id into grp_b;
+  -- Demo roster (no tutor groups: every tutor reviews every fuksi, SDD §11)
 
   insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
                           raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
@@ -194,17 +191,17 @@ begin
          'email', now(), now(), now()
   from auth.users u where u.email like '%@demo.invalid';
 
-  insert into members (guild_id, season_id, user_id, email, display_name, role, tutor_group_id)
-  select g, s, u.id, u.email, u.display_name, u.role, u.grp
+  insert into members (guild_id, season_id, user_id, email, display_name, role)
+  select g, s, u.id, u.email, u.display_name, u.role
   from (values
-    ('00000000-0000-4000-8000-000000000001'::uuid, 'demo.captain@demo.invalid',  'Demo Captain', 'captain', null::bigint),
-    ('00000000-0000-4000-8000-000000000002'::uuid, 'demo.tutor.a@demo.invalid',  'Demo Tutor A', 'tutor',   grp_a),
-    ('00000000-0000-4000-8000-000000000003'::uuid, 'demo.tutor.b@demo.invalid',  'Demo Tutor B', 'tutor',   grp_b),
-    ('00000000-0000-4000-8000-000000000004'::uuid, 'demo.fuksi.1@demo.invalid',  'Demo Fuksi 1', 'fuksi',   grp_a),
-    ('00000000-0000-4000-8000-000000000005'::uuid, 'demo.fuksi.2@demo.invalid',  'Demo Fuksi 2', 'fuksi',   grp_a),
-    ('00000000-0000-4000-8000-000000000006'::uuid, 'demo.fuksi.3@demo.invalid',  'Demo Fuksi 3', 'fuksi',   grp_b),
-    ('00000000-0000-4000-8000-000000000007'::uuid, 'demo.organizer@demo.invalid', 'Demo Organizer', 'organizer', null)
-  ) u(id, email, display_name, role, grp);
+    ('00000000-0000-4000-8000-000000000001'::uuid, 'demo.captain@demo.invalid',  'Demo Captain', 'captain'),
+    ('00000000-0000-4000-8000-000000000002'::uuid, 'demo.tutor.a@demo.invalid',  'Demo Tutor A', 'tutor'),
+    ('00000000-0000-4000-8000-000000000003'::uuid, 'demo.tutor.b@demo.invalid',  'Demo Tutor B', 'tutor'),
+    ('00000000-0000-4000-8000-000000000004'::uuid, 'demo.fuksi.1@demo.invalid',  'Demo Fuksi 1', 'fuksi'),
+    ('00000000-0000-4000-8000-000000000005'::uuid, 'demo.fuksi.2@demo.invalid',  'Demo Fuksi 2', 'fuksi'),
+    ('00000000-0000-4000-8000-000000000006'::uuid, 'demo.fuksi.3@demo.invalid',  'Demo Fuksi 3', 'fuksi'),
+    ('00000000-0000-4000-8000-000000000007'::uuid, 'demo.organizer@demo.invalid', 'Demo Organizer', 'organizer')
+  ) u(id, email, display_name, role);
 
   insert into member_codes (member_id) select id from members where guild_id = g;
 end

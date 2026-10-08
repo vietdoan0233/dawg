@@ -43,13 +43,13 @@ const cell = (v: string | number) => {
 export const toCsv = (rows: (string | number)[][]) => rows.map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
 
 // What one import column means. A category column holds that category's opening balance.
-export type Target = "email" | "name" | "group" | "skip" | `category:${string}`;
+export type Target = "email" | "name" | "skip" | `category:${string}`;
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
 const ALIASES: Record<string, Target> = {
   email: "email", emailaddress: "email", sahkoposti: "email", mail: "email",
   name: "name", nimi: "name", fullname: "name", displayname: "name",
-  group: "group", tutorgroup: "group", ryhma: "group", tutorryhma: "group",
+  group: "skip", tutorgroup: "skip", ryhma: "skip", tutorryhma: "skip", // no tutor groups (SDD §11)
 };
 
 // Header → target by name only; null when unsure (then the AI suggests and the captain decides).

@@ -23,11 +23,20 @@ export type OpenNode = {
 };
 export type LockedNode = { locked: true; category_id: number };
 export type Node = OpenNode | LockedNode;
+// The lowest level above the member's own, and what is still missing (computed in SQL; render as-is, SDD §11.2).
+export type NextTier = {
+  tier_id: number;
+  name: string;
+  points_needed: number;
+  unmet: { category_id: number; have: number; need: number }[];
+  required_missing: number;
+};
 export type Roadmap = {
   member_id: number;
   total: number;
   own_tier_id: number | null;
   tiers: Tier[];
+  next_tier: NextTier | null; // null at the top level
   categories: Category[];
   nodes: Node[];
 };
@@ -91,10 +100,36 @@ export function useRoadmap(guildId: number, track = false) {
   return { map, error, news, refresh };
 }
 
-export type LeaderRow ={ group_id: number; group_name: string; total_points: number };
+// One row per fuksi of the guild, ordered by rank (ties share a rank). Week = rolling 7 days, adjustments excluded.
+export type LeaderRow = {
+  member_id: number;
+  display_name: string;
+  total: number;
+  tier_name: string | null;
+  week_points: number;
+  rank: number;
+  rank_week_ago: number;
+};
 
 export async function loadLeaderboard(guildId: number): Promise<LeaderRow[]> {
   const { data, error } = await db().rpc("leaderboard", { p_guild_id: guildId });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+// Newest approved points of the guild's fuksis in the last 7 days. task_title is null while the task is secret.
+export type ActivityRow = {
+  at: string;
+  member_id: number;
+  display_name: string;
+  category_id: number;
+  task_title: string | null;
+  points: number;
+  secret: boolean;
+};
+
+export async function loadActivity(guildId: number, limit = 20): Promise<ActivityRow[]> {
+  const { data, error } = await db().rpc("activity", { p_guild_id: guildId, p_limit: limit });
   if (error) throw new Error(error.message);
   return data;
 }

@@ -152,13 +152,13 @@ isOneToOne: true
                   ]
                 },"members": {
                   Row: {
-                    "display_name": string,"email": string,"guild_id": number,"id": number,"role": string,"season_id": number,"tutor_group_id": number | null,"user_id": string | null
+                    "display_name": string,"email": string,"guild_id": number,"id": number,"role": string,"season_id": number,"user_id": string | null
                   }
                   Insert: {
-                    "display_name": string,"email": string,"guild_id": number,"id"?: never,"role"?: string,"season_id": number,"tutor_group_id"?: number | null,"user_id"?: string | null
+                    "display_name": string,"email": string,"guild_id": number,"id"?: never,"role"?: string,"season_id": number,"user_id"?: string | null
                   }
                   Update: {
-                    "display_name"?: string,"email"?: string,"guild_id"?: number,"id"?: never,"role"?: string,"season_id"?: number,"tutor_group_id"?: number | null,"user_id"?: string | null
+                    "display_name"?: string,"email"?: string,"guild_id"?: number,"id"?: never,"role"?: string,"season_id"?: number,"user_id"?: string | null
                   }
                   Relationships: [
                     {
@@ -167,12 +167,6 @@ isOneToOne: true
 isOneToOne: false
       referencedRelation: "seasons"
       referencedColumns: ["guild_id","id"]
-    },{
-      foreignKeyName: "members_guild_id_season_id_tutor_group_id_fkey"
-      columns: ["guild_id","season_id","tutor_group_id"]
-isOneToOne: false
-      referencedRelation: "tutor_groups"
-      referencedColumns: ["guild_id","season_id","id"]
     }
                   ]
                 },"rules": {
@@ -306,25 +300,6 @@ isOneToOne: false
       referencedColumns: ["guild_id","id"]
     }
                   ]
-                },"tutor_groups": {
-                  Row: {
-                    "guild_id": number,"id": number,"name": string,"season_id": number
-                  }
-                  Insert: {
-                    "guild_id": number,"id"?: never,"name": string,"season_id": number
-                  }
-                  Update: {
-                    "guild_id"?: number,"id"?: never,"name"?: string,"season_id"?: number
-                  }
-                  Relationships: [
-                    {
-      foreignKeyName: "tutor_groups_guild_id_season_id_fkey"
-      columns: ["guild_id","season_id"]
-isOneToOne: false
-      referencedRelation: "seasons"
-      referencedColumns: ["guild_id","id"]
-    }
-                  ]
                 }
           }
           Views: {
@@ -345,7 +320,12 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "award_task":
+            "activity":
+{ Args: { "p_guild_id": number,"p_limit"?: number }; Returns: {
+              "at": string,"category_id": number,"display_name": string,"member_id": number,"points": number,"secret": boolean,"task_title": string
+            }[]
+                           },
+"award_task":
 { Args: { "p_event_id": number,"p_member_id": number,"p_points": number,"p_reason": string,"p_reviewer_id": number,"p_source": string,"p_submission_id"?: number,"p_task_id": number }; Returns: string
                            },
 "bootstrap_guild":
@@ -386,7 +366,7 @@ isOneToOne: false
                            },
 "leaderboard":
 { Args: { "p_guild_id": number }; Returns: {
-              "group_id": number,"group_name": string,"total_points": number
+              "display_name": string,"member_id": number,"rank": number,"rank_week_ago": number,"tier_name": string,"total": number,"week_points": number
             }[]
                            },
 "list_invites":
@@ -424,7 +404,7 @@ isOneToOne: false
 { Args: { "p_guild_id": number }; Returns: string
                            },
 "set_role":
-{ Args: { "p_member_id": number,"p_role": string,"p_tutor_group_id"?: number }; Returns: undefined
+{ Args: { "p_member_id": number,"p_role": string }; Returns: undefined
                            },
 "submit_task":
 { Args: { "p_note"?: string,"p_photo_path"?: string,"p_photo_sha256"?: string,"p_task_id": number,"p_with_member_ids"?: (number)[] }; Returns: number

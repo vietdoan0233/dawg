@@ -28,6 +28,14 @@ select current_setting('t.g')::bigint, current_setting('t.s')::bigint, c.id, v.t
 insert into events (guild_id, season_id, task_id, title, starts_at, ends_at)
 select guild_id, season_id, id, v.e, now() - interval '1 hour', now() + interval '1 hour'
   from tasks, (values ('Hx live'), ('Hx live 2')) v(e) where title = 'Hx check';
+
+-- a tutor of ANOTHER guild (v4: no tutor groups, so "another group's tutor" became this)
+insert into auth.users (id, email) values ('00000000-0000-4000-8000-0000000000c1', 'xg.tutor@demo.invalid');
+with g as (insert into guilds (name, slug) values ('Elsewhere Guild', 'elsewhere-guild') returning id),
+     s as (insert into seasons (guild_id, name, starts_on, ends_on, is_current)
+           select id, 'x', '2026-09-01', '2027-05-31', true from g returning guild_id, id)
+insert into members (guild_id, season_id, user_id, email, display_name, role)
+select guild_id, id, '00000000-0000-4000-8000-0000000000c1', 'xg.tutor@demo.invalid', 'Elsewhere Tutor', 'tutor' from s;
 select set_config('t.live', (select id::text from events where title = 'Hx live'), true);
 select set_config('t.live2', (select id::text from events where title = 'Hx live 2'), true);
 select set_config('t.photo', (select id::text from tasks where title = 'Hx photo'), true);
@@ -106,10 +114,10 @@ select set_eq(format('select public.duplicate_photos(%s)', current_setting('t.id
               format('values (%s::bigint), (%s)', current_setting('t.sub1'), current_setting('t.sub2')),
               'the tutor sees both copies of the same photo flagged, the unique one not');
 reset role;
-select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000003', true);
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-0000000000c1', true);
 set local role authenticated;
 select is_empty(format('select public.duplicate_photos(%s)', current_setting('t.ids')),
-                'another group''s tutor learns nothing about these submissions');
+                'a tutor of another guild learns nothing about these submissions');
 reset role;
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000004', true);
 set local role authenticated;

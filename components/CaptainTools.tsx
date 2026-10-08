@@ -66,34 +66,30 @@ export function InvitePanel({ guildId }: { guildId: number }) {
   );
 }
 
-type Row = { id: number; display_name: string; role: Role; tutor_group_id: number | null };
+type Row = { id: number; display_name: string; role: Role };
 const ROLES: Role[] = ["fuksi", "tutor", "organizer", "captain"];
 const ROLE_LABEL: Record<Role, string> = { fuksi: "Fuksi", tutor: "Tutor", organizer: "Organizer", captain: "Captain" };
 
 export function RolesPanel({ me }: { me: Me }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [groups, setGroups] = useState<{ id: number; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(() => {
-    const client = db();
-    Promise.all([
-      client.from("members").select("id, display_name, role, tutor_group_id").eq("guild_id", me.guildId).order("display_name"),
-      client.from("tutor_groups").select("id, name").eq("guild_id", me.guildId).order("name"),
-    ]).then(([m, g]) => {
-      if (m.error || g.error) return setError((m.error ?? g.error)!.message);
-      setRows(m.data as Row[]);
-      setGroups(g.data);
-    });
+    db()
+      .from("members")
+      .select("id, display_name, role")
+      .eq("guild_id", me.guildId)
+      .order("display_name")
+      .then(({ data, error }) => (error ? setError(error.message) : setRows(data as Row[])));
   }, [me.guildId]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
-  const save = async (r: Row, role: Role, group: number | null) => {
+  const save = async (r: Row, role: Role) => {
     setError(null);
-    const { error } = await db().rpc("set_role", { p_member_id: r.id, p_role: role, p_tutor_group_id: group ?? undefined });
+    const { error } = await db().rpc("set_role", { p_member_id: r.id, p_role: role });
     if (error) setError(friendly(error.message));
     reload();
   };
@@ -102,7 +98,7 @@ export function RolesPanel({ me }: { me: Me }) {
     <section className="panel">
       <h2>Members and roles</h2>
       <p className="hint">
-        Tutors review proofs from their own group, organizers check people in at events, and captains manage the guild.
+        Tutors review proofs from every fuksi in the guild, organizers check people in at events, and captains manage the guild.
         Changes save immediately.
       </p>
       {error && <p className="error">{error}</p>}
@@ -113,27 +109,13 @@ export function RolesPanel({ me }: { me: Me }) {
             {r.id === me.memberId ? (
               <span className="hint">{ROLE_LABEL[r.role]} (you)</span>
             ) : (
-              <>
-                <select aria-label={`Role of ${r.display_name}`} value={r.role} onChange={(e) => void save(r, e.target.value as Role, r.tutor_group_id)}>
-                  {ROLES.map((x) => (
-                    <option key={x} value={x}>
-                      {ROLE_LABEL[x]}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={`Tutor group of ${r.display_name}`}
-                  value={r.tutor_group_id ?? ""}
-                  onChange={(e) => void save(r, r.role, e.target.value ? Number(e.target.value) : null)}
-                >
-                  <option value="">No tutor group</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </>
+              <select aria-label={`Role of ${r.display_name}`} value={r.role} onChange={(e) => void save(r, e.target.value as Role)}>
+                {ROLES.map((x) => (
+                  <option key={x} value={x}>
+                    {ROLE_LABEL[x]}
+                  </option>
+                ))}
+              </select>
             )}
           </li>
         ))}
@@ -161,7 +143,7 @@ const download = (name: string, text: string) => {
   URL.revokeObjectURL(a.href);
 };
 
-// Roster import (email, name, tutor group, opening points per category) and results export, both in the browser.
+// Roster import (email, name, opening points per category) and results export, both in the browser.
 // Only column headers ever leave it, for AI mapping (map-columns); the rows go straight to import_apply.
 export function ImportExportPanel({ guildId }: { guildId: number }) {
   const [categories, setCategories] = useState<string[]>([]);
@@ -214,7 +196,6 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
     const members = people.map((r) => ({
       email: r[col("email")],
       display_name: col("name") >= 0 ? r[col("name")] : "",
-      tutor_group_name: col("group") >= 0 ? r[col("group")] : null,
     }));
     const adjustments: { email: string; category_name: string; points: number }[] = [];
     for (const [n, r] of people.entries())
@@ -249,9 +230,8 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
     const c = db();
     // progress/member_tier have no guild_id; rows of the caller's other guilds are dropped by the member lookup below
     const all = Promise.all([
-      everyRow((a, b) => c.from("members").select("id, display_name, role, tutor_group_id").eq("guild_id", guildId).order("display_name").order("id").range(a, b)),
+      everyRow((a, b) => c.from("members").select("id, display_name, role").eq("guild_id", guildId).order("display_name").order("id").range(a, b)),
       everyRow((a, b) => c.from("categories").select("id, name").eq("guild_id", guildId).order("id").range(a, b)),
-      everyRow((a, b) => c.from("tutor_groups").select("id, name").eq("guild_id", guildId).order("id").range(a, b)),
       everyRow((a, b) => c.from("tiers").select("id, name").eq("guild_id", guildId).order("id").range(a, b)),
       everyRow((a, b) => c.from("progress").select("member_id, category_id, points").order("member_id").order("category_id").range(a, b)),
       everyRow((a, b) => c.from("member_tier").select("member_id, tier_id").order("member_id").range(a, b)),
@@ -264,15 +244,14 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
     } finally {
       setBusy(false);
     }
-    const [m, cats, g, t, p, mt] = data;
+    const [m, cats, t, p, mt] = data;
     const pts = new Map(p.map((r) => [`${r.member_id}:${r.category_id}`, r.points ?? 0]));
     const tierOf = new Map(mt.map((r) => [r.member_id, t.find((x) => x.id === r.tier_id)?.name ?? ""]));
-    const group = new Map(g.map((x) => [x.id, x.name]));
-    const header = ["Name", "Role", "Tutor group", ...cats.map((x) => x.name), "Total points", "Level"];
+    const header = ["Name", "Role", ...cats.map((x) => x.name), "Total points", "Level"];
     const body = m.map((x) => {
       const per = cats.map((cat) => pts.get(`${x.id}:${cat.id}`) ?? 0);
       const total = per.reduce((a, b) => a + b, 0);
-      return [x.display_name, x.role, group.get(x.tutor_group_id ?? -1) ?? "", ...per, total, tierOf.get(x.id) ?? ""];
+      return [x.display_name, x.role, ...per, total, tierOf.get(x.id) ?? ""];
     });
     download(`fuksipisteet-${new Date().toISOString().slice(0, 10)}.csv`, toCsv([header, ...body]));
   };
@@ -320,7 +299,6 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
                     <option value="skip">Don&apos;t import this column</option>
                     <option value="email">Email address</option>
                     <option value="name">Full name</option>
-                    <option value="group">Tutor group</option>
                     {categories.map((c) => (
                       <option key={c} value={`category:${c}`}>
                         Starting points: {c}

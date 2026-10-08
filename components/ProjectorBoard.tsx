@@ -6,7 +6,7 @@ import { Leaderboard } from "./Leaderboard";
 import { SkillTree } from "./SkillTree";
 
 // Projector: the guild's map without anyone's progress (keyholes stay locked until the captain reveals them)
-// plus the live tutor-group leaderboard. Log the projector in as a fuksi: staff accounts see secrets unlocked.
+// plus the live individual leaderboard. Log the projector in as a fuksi: staff accounts see secrets unlocked.
 export function ProjectorBoard({ guildId, guildName }: { guildId: number; guildName: string }) {
   const { map, error, news } = useRoadmap(guildId);
   const burst = useMemo(() => new Set((news?.revealed ?? []).map((id) => `n${id}`)), [news]);
@@ -31,7 +31,7 @@ export function ProjectorBoard({ guildId, guildName }: { guildId: number; guildN
       />
       <aside className="board-side">
         <h2>
-          <Icon name="trophy" /> Group leaderboard <span className="live">Live</span>
+          <Icon name="trophy" /> Leaderboard <span className="live">Live</span>
         </h2>
         <Leaderboard guildId={guildId} />
         {news && news.revealed.length > 0 && (

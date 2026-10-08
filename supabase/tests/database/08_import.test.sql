@@ -50,19 +50,19 @@ select throws_ok($$ select public.import_apply(current_setting('t.g')::bigint, n
 select lives_ok($$ select public.import_apply(current_setting('t.g')::bigint, null, null,
                     '[{"name": "Same Bar Other Name", "min_total": 999}]', null,
                     '[{"email": "new.fuksi@aalto.fi", "display_name": "New Fuksi"}]', null) $$,
-                'a tier reusing a min_total is skipped, and a roster row without a group keeps its group');
+                'a tier reusing a min_total is skipped, and a roster row is refreshed');
 select throws_ok($$ select public.import_apply(current_setting('t.other')::bigint, null, null, null, null, null, null) $$,
                  '42501', 'forbidden', 'a captain cannot import into another guild');
 reset role;
 
-select is((select g.name from members m join tutor_groups g on g.id = m.tutor_group_id where m.email = 'new.fuksi@aalto.fi'),
-          'Group Z', 'blank tutor group on re-import does not wipe the existing one');
+select is((select display_name from members where email = 'new.fuksi@aalto.fi'), 'New Fuksi',
+          'a roster row carrying a tutor_group_name key is imported (the key is ignored, v4)');
 select ok(not exists (select 1 from tiers where name = 'Same Bar Other Name'), 'colliding tier was skipped');
 
 select is((select requires_photo::text || reviewer || max_repeats || points_max from tasks where title = 'Imported task'),
           'truetutor11', 'omitted task keys take the column defaults');
-select is((select count(*) from tutor_groups where guild_id = current_setting('t.g')::bigint and lower(name) = 'group z'),
-          1::bigint, 'tutor groups match case-insensitively');
+select ok(not exists (select 1 from information_schema.columns where table_schema = 'public' and column_name = 'tutor_group_id'),
+          'import creates no tutor group (members has no tutor_group_id)');
 select is((select array_agg(distinct role) from members where email in ('new.fuksi@aalto.fi', 'other.fuksi@aalto.fi')),
           array['fuksi'], 'a roster "role" column never grants a staff role');
 select is((select sum(a.points) from adjustments a join members m on m.id = a.member_id

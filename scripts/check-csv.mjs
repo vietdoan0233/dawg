@@ -16,7 +16,7 @@ assert.equal(toCsv([["=1+1", "+x", "-y", "@z", "ok"], [-5, 3]]), "'=1+1,'+x,'-y,
 assert.deepEqual(parseCsv(toCsv([['a,"b"', "c;d"]])), [['a,"b"', "c;d"]]);
 
 assert.equal(guessTarget("Sähköposti", []), "email");
-assert.equal(guessTarget("Tutor group", []), "group");
+assert.equal(guessTarget("Tutor group", []), "skip"); // no tutor groups (SDD §11)
 assert.equal(guessTarget("ilmo/culture", ["Ilmo / Culture", "Sports"]), "category:Ilmo / Culture");
 assert.equal(guessTarget("Favourite colour", ["Sports"]), null);
 console.log("csv ok");

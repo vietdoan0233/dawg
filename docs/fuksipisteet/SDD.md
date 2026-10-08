@@ -1,4 +1,4 @@
-# Fuksipisteet — SDD v3.2 (consensus v3.1 + multi-guild §10, round-7 fixes)
+# Fuksipisteet — SDD v4 (v3.2 + §11: individual leaderboard, no tutor groups, fuksi home)
 
 Product: Aalto guilds track fuksi points (tasks + events → points → teekkari cap at Wappu). Today: a printed roadmap + Google Sheets + Telegram photos + manual counting.
 Reference: `fuksi point roadmap for Data Guild.jpg`, a real guild's 6 tracks, 4 tiers, point ranges, write-ins and secret nodes.
@@ -11,9 +11,10 @@ Team: 3 (2 Claude Code, 1 Codex). Hackathon demo, then pilot with 1 guild (~150 
 - **ADR-4 (revised v3) A node is the unit of progress.** Every map node is a `task`. Points are earned **only** as `submissions` rows, whether from a fuksi submission or an organizer check-in (an event points at its task). One internal function `award_task()` owns the lock, the `max_repeats` count, the point range and the snapshot. **No other code awards points.**
 - **ADR-5 Categories are rows.** Composite FKs everywhere; import maps names case-insensitively.
 - **ADR-6 (new) Tiers.** Named levels (Teekkari 40 → Professor 100) are rows in `tiers`. A member reaches a tier when total ≥ `min_total`, every applicable category `rules` row is met, and every `required` task is approved.
+- **ADR-7 (v4) Individual board, no tutor groups.** Product owner: fuksis in a guild already know each other, so every guild member sees every fuksi's name, points, level and rank. Fuksis are not grouped by tutors, so every tutor of a guild reviews every fuksi of that guild (`is_tutor_of` = same guild + current season + target is a fuksi other than the caller). Consequences: RLS widens to "any guild tutor sees every guild fuksi's submissions and proofs" (never staff rows, never other guilds), and the shared queue makes review collisions normal, so `review_submissions` reports them per row (`already_reviewed`) instead of rolling back the batch. Details in §11.
 
 ## 1. Roles
-`fuksi` · `tutor` (approves own group; can scan) · `organizer` (can scan) · `captain` (everything). Invites only create `fuksi`; staff roles only via `set_role`.
+`fuksi` · `tutor` (approves own group; can scan — *superseded by §11: approves every fuksi in the guild*) · `organizer` (can scan) · `captain` (everything). Invites only create `fuksi`; staff roles only via `set_role`.
 Per-task reviewer: `tasks.reviewer` = `tutor` (default) or `captain`. Use `captain` for uncapped/wide-range tasks (jäynä) and person-specific ones ("Tell Fuksi Major a joke").
 
 ## 2. Stack
@@ -26,12 +27,12 @@ Per-task reviewer: `tasks.reviewer` = `tutor` (default) or `captain`. Use `capta
 | Auth | Email 6-digit OTP, `@aalto.fi` via auth hook, custom SMTP + raised rate limits |
 | Demo login | Demo project only: seeded users + "log in as" switcher (`NEXT_PUBLIC_DEMO=1`); pilot project has password sign-in disabled |
 | AI | Claude Haiku 4.5 in `import` only: column mapping on headers + masked samples |
-| **Roadmap view** | **Main fuksi screen = the guild's map.** Phone: one stacked card per category (icon, "9/14p", time-ordered node chain that scrolls sideways). Projector: full 2D map. Colour and icon come from each category row (`categories.color`, `categories.icon`), and import pre-fills them from a default palette. |
-| Leaderboard | Projector polls `leaderboard()` every 5 s; animated |
+| **Roadmap view** | (superseded by §11.2: home page first, map behind a category tap) **Main fuksi screen = the guild's map.** Phone: one stacked card per category (icon, "9/14p", time-ordered node chain that scrolls sideways). Projector: full 2D map. Colour and icon come from each category row (`categories.color`, `categories.icon`), and import pre-fills them from a default palette. |
+| Leaderboard | Projector polls `leaderboard()` every 5 s; animated (superseded by §11: individual, live everywhere) |
 | Export | Member × category matrix + tier per member; **formula-injection-safe CSV** |
 
 ## 3. Schema (migration 0001 — frozen day 0)
-Unchanged from v2.1 unless marked **v3**: privilege block (revoke all + explicit grants), `guilds`, `seasons` (+`is_current`), `tutor_groups`, `members`, `member_codes`, `adjustments`, `invites`, `ai_usage`.
+Unchanged from v2.1 unless marked **v3**: privilege block (revoke all + explicit grants), `guilds`, `seasons` (+`is_current`), `tutor_groups` (superseded by §11: dropped in 0008), `members`, `member_codes`, `adjustments`, `invites`, `ai_usage`.
 
 ```sql
 -- v3.2: categories carry their own look (guilds differ in track count, colours, icons)
@@ -129,14 +130,14 @@ Views (`security_invoker`):
 - `progress(member_id, category_id, points)` = Σ approved `submissions.points_awarded` + Σ `adjustments.points`, grouped by the **snapshotted** `category_id`. It never joins `tasks`, so hidden nodes can't distort a fuksi's total.
 - `member_tier(member_id, tier_id)` = highest tier `t` where total ≥ `t.min_total`, every `rules` row `r` with `r.tier_id is null or rt.min_total <= t.min_total` is met (tier minimums are **cumulative**: Double Doctor also satisfies Doctor's rules), and no task with `required and active` lacks an approved submission. A member with no tier gets no row.
 
-RLS helpers (security definer, current season): `is_member`, `has_role`, `my_member_id`, `is_tutor_of`, **`task_visible(task_id)`** = `revealed_at <= now()` or the caller is staff or owns a submission for it.
+RLS helpers (security definer, current season): `is_member`, `has_role`, `my_member_id`, `is_tutor_of` (superseded by §11: any tutor of the guild), **`task_visible(task_id)`** = `revealed_at <= now()` or the caller is staff or owns a submission for it.
 
 ## 4. RPCs
 | RPC | Who | Does |
 |---|---|---|
 | **`award_task(member_id, task_id, points, reason, source, event_id, reviewer_id, submission_id default null)`** | **internal only: `revoke execute … from public, anon, authenticated`** | Advisory lock `hashtextextended(member_id‖':'‖task_id,0)`. Counts pending+approved rows **excluding `submission_id`**; if ≥ `max_repeats` → `limit_reached`. Checks `points_min ≤ points ≤ points_max`, and that reason is set if points > `points_min`. If `submission_id` is set, UPDATE … `where id = submission_id and status = 'pending' and member_id = $member and task_id = $task`, and raise if 0 rows; otherwise INSERT an approved row with snapshot `category_id`. For check-ins, the duplicate check runs **before** the limit check, then insert with `on conflict (event_id, member_id) where event_id is not null do nothing` → `duplicate`. Callers pass `reviewer_id := my_member_id()`, never client input. Lane A owns it. |
 | `submit_task(task_id, note, photo_path, photo_sha256, with_member_ids)` | fuksi | Rejects if not `task_visible` / not `active`. Enforces `requires_note`/`requires_photo` and the `max_repeats` pre-check (same lock). Inserts `pending`. |
-| `review_submissions(ids, approve, points default null, reason default null)` | `tasks.reviewer` role (tutor of member, or captain) | **Pending rows only.** On approve: calls `award_task(…, submission_id := id)`, with points defaulting to `points_min`. "Approve all" = `points_min` for each. Reject = set `rejected` (no award). |
+| `review_submissions(ids, approve, points default null, reason default null)` | `tasks.reviewer` role (tutor of member, or captain; superseded by §11: any guild tutor) | **Pending rows only.** On approve: calls `award_task(…, submission_id := id)`, with points defaulting to `points_min`. "Approve all" = `points_min` for each. Reject = set `rejected` (no award). Per-row result `ok | limit_reached | rejected | already_reviewed` (the last one added by §11.1 step 4c). |
 | `checkin(event_id, member_code, scanned_at)` | organizer/tutor/captain | Resolves the code, checks the time window (±2 h, ≤24 h old), then `award_task(points_min, source='checkin', reviewer=scanner)`. Ignores `revealed_at`. Returns `ok | duplicate | limit_reached | unknown | outside_window`. Lane C writes **only** the resolve/window part. |
 | `roadmap(guild_id)` | member | Visible nodes with own status (dim / pending / lit, repeat dots). **Hidden nodes appear as locked placeholders** `{category_id, locked: true}`, with no title or points. Tiers + own tier. |
 | `update_task(task_id, …)` | captain | Includes reveal (`revealed_at = now()`) and scheduled reveal. |
@@ -151,11 +152,12 @@ v2.1 privileges, matrix, storage, retention and GDPR, **plus**:
 - **Export:** cells starting with `= + - @ \t \r` are prefixed with `'` (formula injection).
 - **Write-ins:** text rendered by React only (never `dangerouslySetInnerHTML`); 500-char limit.
 - **Sensitive proofs:** "10 ECTS credits" is `requires_photo = false`, checked by the tutor in person. The privacy notice says: never upload transcripts.
+- **v4 public board (GDPR Art. 13):** the privacy notice, shown at `join_guild` before the first login, lists exactly the fields `leaderboard()` and `activity()` return (name, total, level, weekly points, rank and rank movement, and dated "name · task · +Np" activity), who sees them (every member of the guild, plus the event projector, which non-members in the room can see), and how long they are kept (the feed covers 7 days; totals are kept for the season, then follow the existing retention). It is a pilot gate (§11.6 lane C), not a hackathon gate: the demo uses seeded fake users.
 
 ## 6. Key flows
 1. **Onboard:** captain imports the sheet or roadmap (AI mapping preview), giving categories, nodes (ranges, repeats, required, secret), tiers, rules, roster and opening balances. Then invite → OTP → join.
-2. **Map:** fuksi home = roadmap cards + tier ladder ("12p to Teekkari"). Tapping a node opens the submit sheet. The 8 grey write-in pills ("+ my own event") open with an "Event name" field.
-3. **Approve:** tutor queue (or captain queue for captain-reviewed nodes). Swipe, with a points stepper defaulting to min. "Approve all" = min.
+2. **Map:** (superseded by §11.2) fuksi home = roadmap cards + tier ladder ("12p to Teekkari"). Tapping a node opens the submit sheet. The 8 grey write-in pills ("+ my own event") open with an "Event name" field.
+3. **Approve:** (superseded by §11: one shared tutor queue per guild) tutor queue (or captain queue for captain-reviewed nodes). Swipe, with a points stepper defaulting to min. "Approve all" = min.
 4. **Check-in:** organizer scans → node lights up. `limit_reached`/`unknown`/`outside_window` are shown and stop retrying.
 5. **Reveal:** captain taps reveal → keyhole unlocks on the next poll (projector + phones).
 6. **Export:** matrix + tier per member.
@@ -167,7 +169,7 @@ v2.1 privileges, matrix, storage, retention and GDPR, **plus**:
 4. **Photos:** capture, storage, purge, duplicates, approve-all, points stepper.
 5. **Import/export + reveal + polish.**
 
-Demo (3 min): fuksi opens their map → organizer scans at an event and a node lights up → tutor approves a photo and picks 2p → tier ladder ticks → **captain reveals a keyhole and it unlocks on the projector** → mention import and export.
+Demo (3 min, v4): fuksi home shows "**12p to Doctor**" and the unmet chips → organizer scans at an event and a node lights up → tutor approves a photo and picks 2p → the phone toasts "**You moved up to #6**" and the projector board FLIPs within 5 s, with the MVP crown → **captain reveals a keyhole and it unlocks on the projector** → mention import and export. Rehearsed as a Playwright run at 1280x720 (§11.6 lane C). Fallback: the v3.2 tree demo, tagged `demo-v3.2` before lane C starts.
 
 ## 8. Lanes & contracts
 - Day-0 contract: 0001 (incl. `award_task`), RPC signatures, generated types.
@@ -215,7 +217,183 @@ Demo (3 min): fuksi opens their map → organizer scans at an event and a node l
 
 The admin sends that link to the captain. The existing `join_guild` email-claim path makes only the OTP-verified owner of that email captain; anyone else using the link gets `fuksi`. There are no new invite semantics: invites still never carry a role. pgTAP covers it: a different email joining through the bootstrap invite gets `fuksi`, and no client-created invite can ever produce a captain. The captain then imports their sheet or roadmap, and everything else is self-service.
 
+## 11. v4: individual leaderboard, no tutor groups, fuksi home & game loop
+Product-owner decisions (not open questions): (1) the leaderboard is **individual**: every guild member sees every fuksi's name, points and rank, because fuksis in a guild already know each other; (2) **no tutor groups**: every tutor reviews every fuksi in their guild; (3) one live leaderboard for everyone; (4) a fuksi **home page** (points vs next goal → categories → skill tree with a category sidebar); (5) a small, habit-forming game loop; (6) the tree pans and zooms at 60 fps. This section overrides older text marked "(superseded by §11)".
+
+### 11.1 Data: migration `0008_v4_individual_ranks.sql` (0001 stays frozen)
+No new tables, so every multi-guild rule (§0, §10) holds unchanged. In order:
+1. **`is_tutor_of(p_member_id)`**: `create or replace`, same signature. The `tutor_group_id` join goes, and the new body names the target as well as the caller: `me.role = 'tutor' and tgt.role = 'fuksi' and tgt.id <> me.id and tgt.guild_id = me.guild_id and tgt.season_id = me.season_id and me.season_id = public.current_season(me.guild_id)`. So a tutor is "tutor of" every **fuksi** in the guild, but never of themselves or of other staff. A fuksi promoted mid-season cannot approve their own pending rows (`review_submissions` raises `forbidden`) or read staff proofs. It is the shared function, so all six callers switch at once with no other edit: `submissions_select`, `adjustments_select`, `proofs_select` (storage), `review_submissions`, `duplicate_photos` and `required_missing`. Keep the name: renaming means rewriting six policies and functions for no change in behaviour.
+2. **`required_missing(p_member_id)`**: the access clause becomes `public.is_member(m.guild_id)`. This is required, not optional: `leaderboard()` is a definer, but `auth.uid()` is still the caller, so for other members the old self/captain/tutor clause returned `false`, and `member_tier` would show a too-high level whenever a mandatory node was still undone. Levels are public now, so the boolean leaks nothing new.
+3. **`leaderboard(p_guild_id)`**: `drop function` + `create` (the return type changes). Definer; raises `forbidden` unless `is_member`. It returns one row per `role = 'fuksi'` member of the current season, **including unclaimed roster rows** (`user_id is null`: imported fuksis with opening balances who have not logged in yet; they are real people in the guild). Staff never get a row, and other guilds never appear.
+   `(member_id bigint, display_name text, total int, tier_name text, week_points int, rank int, rank_week_ago int)`
+   - `total` = `sum(points)` from the existing `progress` view, the same definition `roadmap()` and `member_tier` use, so the three can never disagree.
+   - **One definition of "week"** (used by `week_points`, the MVP, rank movement, `+Np` and `activity()`): a rolling `now() - interval '7 days'` window, counting **approved submissions only**. The timestamp is `coalesce(reviewed_at, created_at)`: for reviewed submissions that is server time; for check-ins `reviewed_at` is the organizer device's `scanned_at` (migration 0007), which `checkin` bounds to 24 h in the past and 5 min in the future, so an offline-synced check-in counts from when it was scanned, up to a day before it reached the server. That is accepted: it is bounded, set by the organizer's device rather than the fuksi, and it is the honest time of the event. `week_points = coalesce(sum(s.points_awarded) filter (where coalesce(s.reviewed_at, s.created_at) >= now() - interval '7 days'), 0)`. Adjustments (opening balances, bonuses, penalties) count in `total` and therefore in the week-ago baseline, but never in `week_points`, so an import day does not crown whoever had the biggest legacy balance, and a −5 penalty is not "negative activity".
+   - `rank` = `rank() over (order by total desc)` (ties share a rank). `rank_week_ago` = `rank() over (order by total - week_points desc)`.
+   - `tier_name` comes from `member_tier ⋈ tiers`. Pinned query shape: filter the fuksi set first (`f` = this guild, current season, `role = 'fuksi'`), then `left join lateral (select tier_id from public.member_tier mt where mt.member_id = f.id) mt on true`, so the plan evaluates `member_tier` once per guild fuksi and never scans other guilds' members.
+   - It returns no categories, notes, photos or emails. Order by `rank, display_name`.
+4. **`activity(p_guild_id, p_limit int default 20)`** (new): definer, `is_member`, limit clamped to 1..50. It returns the newest approved submissions of fuksis in the current season, in the same rolling 7-day window, on tasks with `active = true`: `(at, member_id, display_name, category_id, task_title, points, secret bool)`.
+   - `task_title` is `null` and `secret = true` while the task's `revealed_at > now()`.
+   - It never returns a note, photo path, award reason or reviewer. The select list is explicit (no `select *`), and pgTAP asserts the exact result columns. Adjustments are left out, matching `week_points`.
+4b. **`roadmap(p_guild_id)`**: `create or replace` (still returns `jsonb`) and adds one key, **`next_tier`**, computed in SQL with the same predicate as `member_tier` (`r.tier_id is null or rt.min_total <= t.min_total`, plus `required_missing`): `{tier_id, name, points_needed, unmet: [{category_id, have, need}], required_missing int}` for the lowest tier above the member's current one, or `null` at the top level. `required_missing` counts undone required nodes, **including hidden ones**, without revealing which. The tier rule then has exactly one home (SQL); the client only renders it. The predicate is still written twice in SQL (`member_tier` and here), so pgTAP holds them in parity (see `10_v4`). ponytail: extract a `tier_gap(member, tier)` helper both use when a third caller appears.
+4c. **`review_submissions(ids, approve, points, reason)`**: `create or replace` with the same signature and return type `(submission_id bigint, result text)`. With one shared queue per guild (decision 2, ~20 tutors), two tutors reviewing the same row is normal, so a stale row must no longer roll back the batch. After the advisory lock and the status re-read, a row whose status is not `pending` does `submission_id := id; result := 'already_reviewed'; return next; continue;` instead of raising `not_pending`. On the reject path, the `update … where status = 'pending'` that finds no row returns `already_reviewed` the same way. Everything else is unchanged: a missing id, an id the caller may not review, or a row from an old season still raises `forbidden` for the whole batch (that is a bad request, not a race), and `limit_reached` stays a per-row result. Per-row result enum (contract, §11.6): **`ok | limit_reached | rejected | already_reviewed`**. `ok` is the existing approve value; it is not renamed to `awarded` because `ReviewQueue.tsx` and pgTAP already match on it.
+5. **`set_role`**: drop `(bigint, text, bigint)`, then create `(bigint, text)` with the same body minus the group.
+6. **`import_apply`**: `create or replace` with the same signature. The member loop drops the group lookup and insert. A `tutor_group_name` key is now ignored (it is no longer in the recordset column list).
+7. **Drop groups**: `alter table members drop column tutor_group_id` (Postgres drops its FK, its index and its column grant along with it). Then `drop table tutor_groups` (its policy and grant go with it).
+8. **Grants**: `revoke all … from public, anon` and `grant execute … to authenticated` on `leaderboard(bigint)`, `activity(bigint,int)` and `set_role(bigint,text)`. Supabase's default privileges would otherwise expose new functions to `anon`.
+- Accepted widening (Security, record it): any tutor now sees every guild **fuksi's** submissions and proof photos (not staff rows, and not their own). The table stays `tutors ⊂ staff ⊂ guild`, and a tutor of another guild still sees nothing.
+- **Cost**: `leaderboard()` evaluates `member_tier` for each fuksi, and at pilot size (~150 fuksis polling every 15 s, plus `activity()` and the 5 s projector) that is about 10 calls/s. Gate: `explain (analyze, buffers)` of `leaderboard()` and `activity()` with **150 fuksis × ~40 approved submissions each, plus a second guild of the same size**, each under 50 ms, with the plan showing `member_tier` evaluated once per guild fuksi. Record the numbers in PROGRESS.md. If the plan shows a Seq Scan on `submissions`, add `create index on submissions (guild_id, season_id, (coalesce(reviewed_at, created_at)) desc) where status = 'approved'`. ponytail: when a bigger guild breaks the gate, cache totals in a table that `award_task` maintains. Don't do it before then.
+- **Import/export**: the CSV guesser (`lib/csv.ts`) and `map-columns` drop the `group` target, so a "Tutor group" column guesses `skip`. Export drops the "Tutor group" column.
+- **Seed**: `seed.sql` drops `tutor_groups`, `grp_a`/`grp_b` and the `tutor_group_id` values. Tutors A and B stay as two plain tutors.
+- **`demo-crowd.sql`**: insert 4 tutors without groups. Each crowd row's reviewer = a random tutor. Pending rows land in the one shared queue. The closing summary prints the top 10 from `leaderboard()` maths (name, total, week points) instead of group totals.
+- **pgTAP**:
+  - Edits:
+    - `03_flow`: tutor B **can** review fuksi 1; the leaderboard asserts individual totals; tutor A **does** learn `required_missing` of f3; the two `throws_ok … 'not_pending'` cases (re-approve and stale reject of an approved row) become `is(result, 'already_reviewed')`, and the row stays `approved` with its original points.
+    - `05_multi_guild`: guild 2's leaderboard has none of guild 1's members.
+    - `06_demo_flow` / `09_hardening`: the "another group's tutor" cases become "a tutor of **another guild**".
+    - `08_import`: a `tutor_group_name` key is accepted and ignored.
+    - `01_privileges`: the new signatures.
+  - New `10_v4.test.sql`:
+    - a fuksi sees every fuksi with name, total and level;
+    - staff get no row;
+    - a non-member gets `forbidden`;
+    - another guild gets no rows;
+    - `rank_week_ago` reflects a point backdated 8 days;
+    - the level shown for **another** fuksi with an undone required node is correct;
+    - `activity` hides the title of an unrevealed task and never carries notes;
+    - `anon` cannot execute either RPC;
+    - `tutor_groups` no longer exists, and a catalog guard finds no function body that still mentions it: `select is((select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prosrc ~* 'tutor_group'), 0::bigint)` (function bodies are not dependency-tracked, so `drop table` alone would not catch a missed one);
+    - `set_role(bigint,text)` works and the 3-argument version is gone;
+    - a fuksi promoted to tutor with a pending row cannot review it (`forbidden`), and a tutor cannot select another tutor's or the captain's submissions;
+    - an opening-balance adjustment created today leaves `week_points = 0`, raises `total`, and gives no MVP;
+    - `activity` skips inactive tasks and returns exactly its 7 documented columns;
+    - `roadmap().next_tier` with a tier-scoped rule plus a **hidden** required node: `unmet` and `required_missing` are correct, and at the top tier it is `null`;
+    - `next_tier` / `member_tier` parity: for every seeded fuksi, `next_tier` is `null` exactly when `member_tier` is the top tier, and a non-null `next_tier` never has empty `unmet`, `required_missing = 0` and `points_needed <= 0` all at once (that would mean the two predicates disagree about a reached level);
+    - mixed review batch: tutor A approves 3 pending rows where 1 was already approved by tutor B → 2 rows `ok` + 1 `already_reviewed`; the 2 are `approved` afterwards (nothing rolled back) and the third keeps tutor B as `reviewed_by`; a reject batch with 1 already-approved row gives `rejected` + `already_reviewed` the same way;
+    - a batch containing an id the caller may not review still raises `forbidden` and changes nothing.
+
+### 11.2 Fuksi home (replaces "home = the tree", §6.2)
+`/` for a fuksi shows a scrolling home page; `/?cat=<id>` shows the tree. Use `router.push`, so the phone's Back button returns home, and `replace` when switching category inside the tree. There is no new route and no state library.
+- **Goal card**: the hub ring (reuse `Hub`) with the total, the current level and "**12p to Doctor**". Under it, one chip per `roadmap().next_tier.unmet` entry ("Culture 3/5p") and, if `required_missing > 0`, a "N must-do tasks left" chip. When `next_tier` is `null` it shows "Max level". **No tier logic in the client**: it renders `next_tier` as-is and never re-derives it from `categories[].min_points`.
+- **Stat strip**: rank `#7` with ▲2/▼1 (`rank_week_ago - rank`), this week's `+Np`, and a weekly streak 🔥N (only your own). Every points, rank and week number uses `font-variant-numeric: tabular-nums`.
+- **Categories**: one card per category with icon, colour, `points/min` bar, lit/total nodes, and a dot if something is pending. Tapping a card opens the tree, which flies to that branch (the existing `focusCat`).
+- **Leaderboard preview**: the top 3 as a podium, then your row with one neighbour each side, then "See all". The full board opens in the existing `Panel`.
+- **Activity**: the last 10 `activity()` rows, e.g. "Aino · Sitsit · +2p", or "Aino unlocked a secret task".
+- **Dock**: My QR · Tree · Leaderboard.
+- **Tree view + category sidebar**: a left rail with one button per category, plus Home at the top. It is icon-only, 56 px, on phones and shows icon, name and points from 720 px up. It replaces the `nav.tracks` chip row.
+  - The active item is the category you are in. `SkillTree` reports it through a new prop, `onCategoryInView(catId)`, fired once per settle (the existing 700 ms timer) for the branch whose nodes are nearest the viewport centre.
+  - Tapping a rail item flies the tree there.
+
+### 11.3 Live leaderboard (fuksi home, staff Ranks tab, projector)
+One `<Leaderboard>` component, in either compact (home) or full mode. "Live" means polling, as the rest of the app does:
+- The projector and the staff tab poll every **5 s**; phones every **15 s**. Polling pauses while `document.hidden` and fires again on `visibilitychange`.
+- The phone's `activity()` call shares that tick.
+- No Realtime: Postgres Changes would need `submissions` in the publication, an RLS check per subscriber per row, and an aggregate re-fetch anyway. ponytail: switch to Realtime broadcast when polling load shows in Supabase metrics.
+- Rows animate their position with the FLIP technique (measure the old position, then a `transform`/`opacity` transition only), using no library, with tabular numbers so the projector doesn't jitter.
+- The projector shows the top 10, this week's MVP and the activity ticker instead of group totals.
+- **Offline**: when a poll fails (basement, no signal), the home and board keep the last data and show an "Offline · updated 3 min ago" pill; the next successful poll clears it. The QR dock stays fully local and works offline.
+- **Shared tutor queue** (§6.3, one per guild, ~20 tutors): sorted oldest-first. The server owns the collision: `review_submissions` returns `already_reviewed` for each row another tutor got to first (§11.1 step 4c) and still commits the rest of the batch. The client drops exactly the rows with that result and shows a quiet "N already done by others" count, not an error toast. It never infers collisions from an exception.
+
+### 11.4 Game loop (small, high-impact set)
+Kept, all derived from existing data with **no new tables**:
+- **Next-goal ring + unmet minimums**: always shows one concrete next step.
+- **Rank movement**: ▲/▼ against a week ago on every row. A rank-up toast ("You moved up to #6") and the level-up/track-complete celebrations are diffed against the **last-seen rank and total stored in `localStorage` per member** (wrapped in try/catch; missing storage just means no toast). On every home load and every poll, the client compares, celebrates once, then stores the new values. So an approval that lands while the app is closed still gets its moment the next time the fuksi opens it. Nothing is shown when the rank drops.
+- **Weekly MVP**: the highest `week_points` (> 0) gets a crown on the board and the projector (ties share it). Weekly means the slow and steady also get a turn. Since `week_points` excludes adjustments, an import day crowns nobody.
+- **Weekly streak**: the number of consecutive ISO weeks, counting this week or last, in which the fuksi **acted**: bucketed by `submissions.created_at` for rows whose status is now `approved`, so a Sunday task approved on Monday still counts for Sunday's week and the fuksi is never punished for tutor lag. It is computed on the phone from the fuksi's own `submissions` (RLS: own rows) in `lib/news.ts`. This is deliberately a different measure from the server's rolling 7-day `week_points` (that one is "points earned lately" and the other is "weeks you showed up"); both are documented here. A broken streak just shows "Start a streak this week", with no loss message.
+- **Celebrations**: the existing neon draw-on, chime and level-up card, plus a **track complete** card when a category reaches its minimum. That card is the badge; there is no badge table.
+- **Activity feed**: social proof that pulls people to events.
+Guardrails (no dark patterns): no push notifications or e-mails, no countdowns or "expiring" rewards, no random/loot rewards, no shaming of last place or lost streaks, a feed capped at 20 rows (no infinite scroll), sound stays toggleable, every animation off under `prefers-reduced-motion`.
+**Cut** (add only on a real ask): achievements/badge tables, XP/coins/shop, daily login rewards, reactions/comments, avatars/photos on the board, per-category boards, team or group competition, notifications.
+
+### 11.5 Tree performance (60 fps)
+**Target:** pan, pinch and wheel-zoom stay at ≥ 60 fps.
+**How it's measured:** a Chrome DevTools Performance trace (chrome-devtools MCP is fine) with a 4× CPU throttle at 375 px, as Demo Fuksi 1 with the crowd loaded, over 10 s of continuous pan + zoom.
+**Pass:** ≥ 95 % of frames ≤ 16.7 ms and no task > 50 ms. Repeat once on a real Android Chrome. Record the numbers in PROGRESS.md. The existing transform-in-a-ref and rAF paint stay.
+Fixes:
+1. `.tree-node.pending` animates `box-shadow` forever, and every paint re-rasterises the moving world layer. Make it an `::after` ring that animates only `transform` and `opacity`.
+2. The neon paths use **three** `drop-shadow` filters each. Replace them with a wider, semi-transparent stroke drawn underneath (no filter). Keep a single `drop-shadow` only if the look needs it.
+3. `memo(SkillNode)` plus one delegated click handler on the world (`data-id`). A 5 s poll that changed nothing then re-renders zero nodes.
+4. Pan **inertia** on release: velocity decays in rAF and stops on the next pointerdown. Wheel zoom is smoothed through the same rAF. Both are off under reduced motion.
+5. `onCategoryInView` (§11.2) is computed at settle only, never per frame.
+6. Move the `.tree-*` rules from `app/globals.css` into `components/SkillTree.css`, imported by `SkillTree.tsx`, so lanes B and C never edit the same file.
+
+### 11.6 Build plan: 3 lanes
+A and B run in parallel and touch disjoint files. C starts once both are merged; its edits to `Leaderboard.tsx` are a sequential hand-off from A, and it only **consumes** `lib/roadmap.ts` (A owns it, including the `next_tier` type).
+Contract (fixed before A and B start): `leaderboard(bigint)` and `activity(bigint,int)` signatures as in §11.1; `roadmap().next_tier` shape as in §11.1 step 4b; `review_submissions` per-row `result` is one of `ok | limit_reached | rejected | already_reviewed` (§11.1 step 4c; signature unchanged, so `types/database.ts` still says `string` and `ReviewQueue.tsx` matches on the literals); `SkillTree` prop `onCategoryInView: (catId: number) => void`, fired once per settle.
+
+**Lane A (DB), branch `slice/v4-a-db`**
+- Files:
+  - `supabase/migrations/0008_v4_individual_ranks.sql`
+  - `supabase/tests/database/{01,03,05,06,08,09}_*.test.sql` plus the new `10_v4.test.sql`
+  - `types/database.ts` (regenerated)
+  - `supabase/seed.sql`, `supabase/demo-crowd.sql`
+  - `components/CaptainTools.tsx` (no group select or export column)
+  - `lib/csv.ts`, `scripts/check-csv.mjs`, `supabase/functions/map-columns/index.ts`
+  - `lib/roadmap.ts` (`LeaderRow`, `loadLeaderboard`, new `loadActivity`, `NextTier` type on the roadmap result)
+  - `components/Leaderboard.tsx`: only the minimal swap to individual rows, so the build stays green
+  - the group lines in `docs/fuksipisteet/{ARCHITECTURE-SIMPLE,USER-WORKFLOWS}.md`
+- Reviews: run `ecc:database-reviewer` and `ecc:security-reviewer` (RLS widening).
+- Acceptance:
+  - `supabase db reset` + `supabase test db` all pass;
+  - after `npm run demo:crowd`, `leaderboard()` as Demo Fuksi 3 returns 51 rows, none of them staff;
+  - the §11.1 cost gate (150 fuksis × ~40 submissions + a second guild, `explain (analyze, buffers)`) is under 50 ms for both RPCs and recorded in PROGRESS.md;
+  - Tutor A approves Demo Fuksi 3 in the browser;
+  - `npm run build`, `npm run lint` and `node scripts/check-csv.mjs` pass.
+
+**Lane B (tree perf), branch `slice/v4-b-tree`**
+- Files: `components/SkillTree.tsx`, the new `components/SkillTree.css`, and only the deletion of the `.tree-*` block from `app/globals.css`.
+- Acceptance:
+  - the §11.5 trace passes and the before/after numbers are recorded;
+  - no visual change at 375 px or on desktop;
+  - `onCategoryInView` fires once per settle;
+  - `node scripts/check-news.mjs`, build and lint pass.
+
+**Lane C (home + board + game), branch `slice/v4-c-home`, after A and B**
+- Files:
+  - `components/FuksiHome.tsx` (home page, tree view, category rail)
+  - `components/Leaderboard.tsx` (compact/full modes, podium, ▲▼, MVP, FLIP, visibility-aware poll)
+  - `components/ProjectorBoard.tsx`
+  - `lib/news.ts` + `scripts/check-news.mjs` (`weekStreak` by `created_at`, last-seen rank/total diff)
+  - `components/ReviewQueue.tsx` (oldest-first; drop rows whose result is `already_reviewed` and count them, for both "Approve all" and single approve/reject)
+  - `app/globals.css` (non-tree rules)
+  - `app/layout.tsx` (description copy without "tutor group")
+- Acceptance (clicked through in Chrome):
+  1. Demo Fuksi 1's home shows "Np to <level>", the `next_tier` chips, category cards, rank and streak.
+  2. Tapping Culture flies the tree there and the rail highlights Culture. Panning to another branch moves the highlight. Back returns home.
+  3. Tutor approves → within 15 s the phone shows the toast, the new rank and the feed row; the projector updates within 5 s. With the phone's tab closed during the approval, reopening home shows the toast once.
+  4. Offline (DevTools) shows the "Offline · updated …" pill with the last data; two tutors approving the same row gives the second one a quiet "already done" count, not an error; tutor X's "Approve all" over 30 rows, one of which tutor Y approved a second earlier, approves the other 29.
+  5. No horizontal scroll at 375 px; reduced motion turns every animation off.
+  6. The §7 v4 demo runs end to end as a rehearsed Playwright script at 1280x720.
+  7. Build, lint and `check-news` pass.
+- **Pilot gate** (not needed for the hackathon): the §5 v4 privacy notice is live at `join_guild`.
+
 ---
+## Appendix F: v4 resolution log
+Product-owner decisions (1)–(6) in §11 are fixed. No blocker reversed them; where one touched them, it was resolved by designing around it.
+
+| Proposal | Outcome | Decided by |
+|---|---|---|
+| Goal card re-derives tier rules from `categories[].min_points` (wrong for per-tier rules, blind to hidden required nodes) | **Accepted.** `roadmap()` returns `next_tier {tier_id, name, points_needed, unmet[], required_missing}` computed with `member_tier`'s predicate; client renders as-is (§11.1 4b, §11.2); pgTAP case with tier-scoped rule + hidden required node | Architect |
+| `is_tutor_of` puts no condition on the target (self-review after promotion, staff proofs readable) | **Accepted.** Body requires `tgt.role = 'fuksi'`, `tgt.id <> me.id`, same guild and current season (§11.1 step 1); pgTAP: promoted fuksi can't review own row, tutor can't read other staff rows. Decision (2) holds: every tutor still reviews every fuksi | Security + Database |
+| Public board processes personal data with no Art. 13 notice | **Accepted, designed around decision (1).** Names stay public to the guild; §5 adds a notice listing the exact fields, audience (guild + projector) and retention; pilot gate in lane C, not a hackathon gate | Security |
+| `week_points` counts adjustments (import day crowns legacy balances, ranks all tie a week ago, penalties read as negative activity) | **Accepted.** One "week" = rolling 7 d, server-stamped, approved submissions only; adjustments count in `total` and the baseline only; matches `activity()`; pgTAP: opening balance today → `week_points = 0`, no MVP | Database + Product + Architect |
+| Cost gate sized at 51 fuksis, one guild, plain `explain analyze` | **Accepted.** 150 fuksis × ~40 submissions + second guild, `explain (analyze, buffers)`, < 50 ms for both RPCs, recorded in PROGRESS.md; lateral join shape pinned; partial index only if a Seq Scan shows | Database + Security |
+| §7 demo still opens with the map | **Accepted.** v4 demo script (home → scan → approve → rank-up toast + projector FLIP + MVP → keyhole → import/export), rehearsed in Playwright at 1280x720; `demo-v3.2` tag as fallback | Product |
+| Rank-up toast only fires between polls, so almost never | **Accepted.** Diff against last-seen rank/total in `localStorage` per member on load and on every poll | Product |
+| Streak lost to tutor lag | **Accepted.** Bucket by `submissions.created_at` of now-approved rows; difference from rolling `week_points` documented as intentional | Product + Architect |
+| Offline poll failure and shared-queue collisions unspecified | **Accepted.** Keep last data + "Offline · updated …" pill, QR stays local; queue oldest-first, already-reviewed rows dropped silently with a quiet count | Product |
+| `total` defined twice | **Accepted.** `leaderboard().total` reads the `progress` view | Architect |
+| Lane C / `lib/roadmap.ts` ownership and `onCategoryInView` signature | **Accepted.** A owns `lib/roadmap.ts`, C consumes; contract line in §11.6 | Architect |
+| Catalog guard for stray `tutor_group` references in function bodies | **Accepted** (pgTAP in `10_v4`) | Database |
+| `activity()` should skip inactive tasks and pin its columns | **Accepted** | Security |
+| Unclaimed roster rows on the board? | **Stated:** they appear (they are real guild fuksis with opening balances) | Database |
+| Tabular numbers, FLIP on transform/opacity only | **Accepted** | Product |
+| Captain-only projector mode (first name + initial) | **Deferred.** Decision (1) says names are fine; add on a real ask | Security (nice-to-have), product owner |
+| Rank and `week_points` in the CSV export | **Deferred** until a captain asks | Product (nice-to-have) |
+| Shared queue relies on a "silent drop" the server can't support: `review_submissions` raises `not_pending` mid-loop and rolls back the whole batch (with ~20 tutors on one queue, one collision loses 29 of 30 approvals) | **Accepted, makes decision (2) workable.** §11.1 step 4c: same signature, a non-pending row (after lock + re-read, and on the reject path's 0-row update) returns `already_reviewed` and the loop continues; `forbidden` still aborts the batch. Result enum `ok \| limit_reached \| rejected \| already_reviewed` in the §11.6 contract (`ok` kept instead of `awarded`, since the client and pgTAP already match on it). pgTAP: mixed batch of 3 → 2 `ok` + 1 `already_reviewed`, nothing rolled back; `03_flow` `not_pending` cases updated. §11.3 and lane C: client drops exactly the `already_reviewed` rows | Architect |
+| Tier predicate has two SQL homes (`member_tier`, `next_tier`) | **Accepted (test now, refactor later).** pgTAP parity check in `10_v4`; `tier_gap()` helper deferred until a third caller (ponytail note in step 4b) | Architect (nice-to-have) |
+| "Stamped on the server" is wrong for check-ins (`reviewed_at` = device `scanned_at`, ≤ 24 h old) | **Accepted (wording).** §11.1 "week" now states the timestamp source and accepts the bounded 24 h skew; no code change | Architect (nice-to-have) |
+| Record the RLS widening and group removal as an ADR | **Accepted.** ADR-7 in §0 | Architect (nice-to-have) |
+
 ## Appendix E: v3.2 (multi-guild)
 - `categories.color` (hex CHECK) and `categories.icon` (enum CHECK) replace the hardcoded 6-slot palette, because a guild with 7 tracks would have broken it. Database proposed the colour CHECK in round 4 and Security the icon enum. The Minimalist's ponytail trigger ("when a 2nd guild needs its own look") is now met.
 - §10 documents how guild-to-guild variation is handled, plus `bootstrap_guild`.

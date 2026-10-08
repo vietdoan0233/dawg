@@ -7,11 +7,11 @@ import { Icon } from "./Icon";
 // password sign-in disabled, so this cannot work there even if shipped.
 const DEMO_PASSWORD = "demo-password";
 const DEMO_USERS = [
-  { label: "Fuksi 1", sub: "Group A · earn points", icon: "star", email: "demo.fuksi.1@demo.invalid" },
-  { label: "Fuksi 2", sub: "Group A · earn points", icon: "star", email: "demo.fuksi.2@demo.invalid" },
-  { label: "Fuksi 3", sub: "Group B · earn points", icon: "star", email: "demo.fuksi.3@demo.invalid" },
-  { label: "Tutor A", sub: "Approve Group A's task proofs", icon: "inbox", email: "demo.tutor.a@demo.invalid" },
-  { label: "Tutor B", sub: "Approve Group B's task proofs", icon: "inbox", email: "demo.tutor.b@demo.invalid" },
+  { label: "Fuksi 1", sub: "Complete tasks, earn points", icon: "star", email: "demo.fuksi.1@demo.invalid" },
+  { label: "Fuksi 2", sub: "Complete tasks, earn points", icon: "star", email: "demo.fuksi.2@demo.invalid" },
+  { label: "Fuksi 3", sub: "Complete tasks, earn points", icon: "star", email: "demo.fuksi.3@demo.invalid" },
+  { label: "Tutor A", sub: "Approve fuksis' task proofs", icon: "inbox", email: "demo.tutor.a@demo.invalid" },
+  { label: "Tutor B", sub: "Approve fuksis' task proofs", icon: "inbox", email: "demo.tutor.b@demo.invalid" },
   { label: "Organizer", sub: "Check people in at events", icon: "scan", email: "demo.organizer@demo.invalid" },
   { label: "Captain", sub: "Run the guild, reveal secret tasks", icon: "crown", email: "demo.captain@demo.invalid" },
 ];
