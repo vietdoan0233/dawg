@@ -7,13 +7,13 @@ import { Icon } from "./Icon";
 // password sign-in disabled, so this cannot work there even if shipped.
 const DEMO_PASSWORD = "demo-password";
 const DEMO_USERS = [
-  { label: "Fuksi 1", sub: "Group A · fill your skill tree", icon: "star", email: "demo.fuksi.1@demo.invalid" },
-  { label: "Fuksi 2", sub: "Group A · fill your skill tree", icon: "star", email: "demo.fuksi.2@demo.invalid" },
-  { label: "Fuksi 3", sub: "Group B · fill your skill tree", icon: "star", email: "demo.fuksi.3@demo.invalid" },
-  { label: "Tutor A", sub: "Review Group A's proofs", icon: "inbox", email: "demo.tutor.a@demo.invalid" },
-  { label: "Tutor B", sub: "Review Group B's proofs", icon: "inbox", email: "demo.tutor.b@demo.invalid" },
+  { label: "Fuksi 1", sub: "Group A · earn points", icon: "star", email: "demo.fuksi.1@demo.invalid" },
+  { label: "Fuksi 2", sub: "Group A · earn points", icon: "star", email: "demo.fuksi.2@demo.invalid" },
+  { label: "Fuksi 3", sub: "Group B · earn points", icon: "star", email: "demo.fuksi.3@demo.invalid" },
+  { label: "Tutor A", sub: "Approve Group A's task proofs", icon: "inbox", email: "demo.tutor.a@demo.invalid" },
+  { label: "Tutor B", sub: "Approve Group B's task proofs", icon: "inbox", email: "demo.tutor.b@demo.invalid" },
   { label: "Organizer", sub: "Check people in at events", icon: "scan", email: "demo.organizer@demo.invalid" },
-  { label: "Captain", sub: "Run the guild, reveal secrets", icon: "crown", email: "demo.captain@demo.invalid" },
+  { label: "Captain", sub: "Run the guild, reveal secret tasks", icon: "crown", email: "demo.captain@demo.invalid" },
 ];
 
 export function DemoSwitcher({ current, compact = false }: { current?: string; compact?: boolean }) {
@@ -26,13 +26,13 @@ export function DemoSwitcher({ current, compact = false }: { current?: string; c
     setBusy(email);
     const { error } = await db().auth.signInWithPassword({ email, password: DEMO_PASSWORD });
     setBusy(null);
-    if (error) setError(error.message);
+    if (error) setError(`Couldn't log in as this demo user. Please try again. (${error.message})`);
   };
 
   if (compact) {
     return (
-      <select className="demo-compact" value="" aria-label="Switch demo user" onChange={(e) => e.target.value && void logInAs(e.target.value)}>
-        <option value="">{current ? `Demo: ${current}` : "Demo user…"}</option>
+      <select className="demo-compact" value="" aria-label="Switch to another demo user" onChange={(e) => e.target.value && void logInAs(e.target.value)}>
+        <option value="">{current ? `Demo: ${current}` : "Switch user…"}</option>
         {DEMO_USERS.map((u) => (
           <option key={u.email} value={u.email}>
             {u.label}
@@ -43,7 +43,7 @@ export function DemoSwitcher({ current, compact = false }: { current?: string; c
   }
 
   return (
-    <section className="characters" aria-label="Choose a demo user">
+    <section className="characters" aria-label="Choose a demo user to try the app">
       <h2>Choose your character</h2>
       <div className="character-grid">
         {DEMO_USERS.map((u) => (

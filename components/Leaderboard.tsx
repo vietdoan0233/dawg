@@ -28,14 +28,14 @@ export function Leaderboard({ guildId }: { guildId: number }) {
   }, [guildId]);
 
   if (!rows) return error ? <p className="error">{error}</p> : <p className="hint">Loading the leaderboard…</p>;
-  if (rows.length === 0) return <p className="hint">No tutor groups yet.</p>;
+  if (rows.length === 0) return <p className="hint">No tutor groups yet. They will appear here once the captain adds them.</p>;
   const top = Math.max(1, ...rows.map((r) => r.total_points));
   return (
     <>
       <ol className="leaders">
         {rows.map((r, i) => (
           <li key={r.group_id} className={i === 0 && r.total_points > 0 ? "first" : undefined}>
-            <span className="rank" aria-label={`Rank ${i + 1}`}>
+            <span className="rank" aria-label={`Place ${i + 1}`}>
               {i === 0 && r.total_points > 0 ? <Icon name="crown" size={18} /> : i + 1}
             </span>
             <span className="name">{r.group_name}</span>
@@ -44,7 +44,7 @@ export function Leaderboard({ guildId }: { guildId: number }) {
           </li>
         ))}
       </ol>
-      {error && <p className="error">Connection problem, retrying: {error}</p>}
+      {error && <p className="error">Can&apos;t update the leaderboard right now. Trying again…</p>}
     </>
   );
 }

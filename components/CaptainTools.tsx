@@ -38,23 +38,26 @@ export function InvitePanel({ guildId }: { guildId: number }) {
   return (
     <section className="panel">
       <h2>Invite links</h2>
-      <p className="hint">Anyone with a link and an @aalto.fi email joins as a fuksi.</p>
+      <p className="hint">
+        Share a link in your fuksi group chat. Anyone who opens it and logs in with an @aalto.fi email joins your guild as a fuksi.
+      </p>
       <button type="button" className="primary" onClick={() => void call(db().rpc("create_invite", { p_guild_id: guildId }))}>
-        New invite link
+        Create invite link
       </button>
+      {invites.length === 0 && !error && <p className="hint">No active links. Create one to invite people.</p>}
       {error && <p className="error">{error}</p>}
       <ul className="queue">
         {invites.map((i) => (
           <li key={i.code} className="row">
             <code className="grow">{link(i.code)}</code>
             <span className="hint">
-              {i.used_count}/{i.max_uses} · until {new Date(i.expires_at).toLocaleDateString()}
+              Used {i.used_count} of {i.max_uses} · expires {new Date(i.expires_at).toLocaleDateString()}
             </span>
             <button type="button" onClick={() => void navigator.clipboard.writeText(link(i.code))}>
-              Copy
+              Copy link
             </button>
             <button type="button" onClick={() => void call(db().rpc("revoke_invite", { p_code: i.code }))}>
-              Revoke
+              Disable link
             </button>
           </li>
         ))}
@@ -65,6 +68,7 @@ export function InvitePanel({ guildId }: { guildId: number }) {
 
 type Row = { id: number; display_name: string; role: Role; tutor_group_id: number | null };
 const ROLES: Role[] = ["fuksi", "tutor", "organizer", "captain"];
+const ROLE_LABEL: Record<Role, string> = { fuksi: "Fuksi", tutor: "Tutor", organizer: "Organizer", captain: "Captain" };
 
 export function RolesPanel({ me }: { me: Me }) {
   const [rows, setRows] = useState<Row[]>([]);
@@ -96,19 +100,25 @@ export function RolesPanel({ me }: { me: Me }) {
 
   return (
     <section className="panel">
-      <h2>People & roles</h2>
+      <h2>Members and roles</h2>
+      <p className="hint">
+        Tutors review proofs from their own group, organizers check people in at events, and captains manage the guild.
+        Changes save immediately.
+      </p>
       {error && <p className="error">{error}</p>}
       <ul className="queue">
         {rows.map((r) => (
           <li key={r.id} className="row">
             <span className="grow">{r.display_name}</span>
             {r.id === me.memberId ? (
-              <span className="hint">{r.role} (you)</span>
+              <span className="hint">{ROLE_LABEL[r.role]} (you)</span>
             ) : (
               <>
                 <select aria-label={`Role of ${r.display_name}`} value={r.role} onChange={(e) => void save(r, e.target.value as Role, r.tutor_group_id)}>
                   {ROLES.map((x) => (
-                    <option key={x}>{x}</option>
+                    <option key={x} value={x}>
+                      {ROLE_LABEL[x]}
+                    </option>
                   ))}
                 </select>
                 <select
@@ -116,7 +126,7 @@ export function RolesPanel({ me }: { me: Me }) {
                   value={r.tutor_group_id ?? ""}
                   onChange={(e) => void save(r, r.role, e.target.value ? Number(e.target.value) : null)}
                 >
-                  <option value="">no group</option>
+                  <option value="">No tutor group</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.name}
@@ -173,11 +183,11 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
   const pick = async (file: File) => {
     setError(null);
     setNote(null);
-    if (file.size > 1_000_000) return setError("That file is over 1 MB. Export only the roster sheet as CSV.");
+    if (file.size > 1_000_000) return setError("This file is larger than 1 MB. Save only the sheet with your fuksi list as CSV and try again.");
     const parsed = parseCsv(await file.text());
-    if (parsed.length < 2) return setError("The file needs a header row and at least one person.");
-    if (parsed.length - 1 > MAX_ROWS) return setError(`At most ${MAX_ROWS} people per import.`);
-    if (parsed[0].some((h) => h.includes("@"))) return setError("The first row must be column names, not a person.");
+    if (parsed.length < 2) return setError("This file needs a row of column names followed by at least one person.");
+    if (parsed.length - 1 > MAX_ROWS) return setError(`You can import up to ${MAX_ROWS} people at a time. Split the file and import it in parts.`);
+    if (parsed[0].some((h) => h.includes("@"))) return setError("The first row should contain column names (like \"Email\" or \"Name\"), not a person.");
     setBusy(true);
     const guesses = parsed[0].map((h) => guessTarget(h, categories));
     const unknown = parsed[0].filter((_, i) => !guesses[i]);
@@ -187,7 +197,7 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
         body: { guild_id: guildId, headers: unknown, categories },
       });
       if (data) ai = data.mapping;
-      else setNote("No AI suggestions right now; set the unknown columns yourself.");
+      else setNote("Automatic suggestions aren't available right now. Please choose the remaining columns yourself.");
     }
     setBusy(false);
     setRows(parsed);
@@ -199,7 +209,7 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
     setError(null);
     setNote(null);
     const col = (t: Target) => targets.indexOf(t);
-    if (targets.filter((t) => t === "email").length !== 1) return setError("Pick exactly one email column.");
+    if (targets.filter((t) => t === "email").length !== 1) return setError("Choose exactly one column as \"Email address\".");
     const people = rows.slice(1);
     const members = people.map((r) => ({
       email: r[col("email")],
@@ -211,7 +221,7 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
       for (const [i, t] of targets.entries()) {
         if (!t.startsWith("category:") || !r[i]) continue;
         const points = Number(r[i]);
-        if (!Number.isInteger(points)) return setError(`Row ${n + 2}: "${r[i]}" under ${rows[0][i]} is not a whole number.`);
+        if (!Number.isInteger(points)) return setError(`Row ${n + 2}: "${r[i]}" in the column "${rows[0][i]}" should be a whole number of points.`);
         adjustments.push({ email: r[col("email")], category_name: t.slice("category:".length), points });
       }
     setBusy(true);
@@ -227,7 +237,9 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
     setBusy(false);
     if (error) return setError(friendly(error.message));
     const done = data as { members: number; adjustments: number };
-    setNote(`Imported ${done.members} people and ${done.adjustments} opening balances. Send them an invite link to join.`);
+    setNote(
+      `Done! Added ${done.members} ${done.members === 1 ? "person" : "people"} and ${done.adjustments} starting point ${done.adjustments === 1 ? "balance" : "balances"}. Next, send them an invite link from the People tab so they can log in.`,
+    );
     setRows(null);
   };
 
@@ -256,7 +268,7 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
     const pts = new Map(p.map((r) => [`${r.member_id}:${r.category_id}`, r.points ?? 0]));
     const tierOf = new Map(mt.map((r) => [r.member_id, t.find((x) => x.id === r.tier_id)?.name ?? ""]));
     const group = new Map(g.map((x) => [x.id, x.name]));
-    const header = ["name", "role", "tutor group", ...cats.map((x) => x.name), "total", "tier"];
+    const header = ["Name", "Role", "Tutor group", ...cats.map((x) => x.name), "Total points", "Level"];
     const body = m.map((x) => {
       const per = cats.map((cat) => pts.get(`${x.id}:${cat.id}`) ?? 0);
       const total = per.reduce((a, b) => a + b, 0);
@@ -268,38 +280,50 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
   return (
     <>
       <section className="panel">
-        <h2>Import roster</h2>
-        <p className="hint">
-          A CSV with one person per row: email, name, tutor group, and optionally a column per category with points they
-          already have. Re-importing the same file is safe. Everyone joins as a fuksi; set staff roles under People.
-        </p>
+        <h2>Add people from a spreadsheet</h2>
         {!rows && (
-          <label className="row">
-            {busy ? "Reading…" : "CSV file"}
-            <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(e) => e.target.files?.[0] && void pick(e.target.files[0])} />
-          </label>
+          <>
+            <p className="hint">Already tracking fuksis in Excel or Google Sheets? Bring them in instead of adding everyone by hand.</p>
+            <ol className="hint">
+              <li>Save your sheet as a CSV file (in Excel: File → Save As → CSV).</li>
+              <li>Choose the file below. Nothing is saved until you press Import.</li>
+              <li>Tell us what each column contains, then press Import.</li>
+            </ol>
+            <p className="hint">
+              One row per person with at least an @aalto.fi email address. Columns with points they have already earned become
+              their starting points. Importing the same file again won&apos;t create duplicates. Everyone is added as a fuksi;
+              give staff roles under People.
+            </p>
+            <label className="row">
+              {busy ? "Reading the file…" : "Choose a CSV file"}
+              <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(e) => e.target.files?.[0] && void pick(e.target.files[0])} />
+            </label>
+          </>
         )}
         {rows && (
           <>
-            <p className="hint">{rows.length - 1} people. Check what each column means:</p>
+            <p className="hint">
+              Found <strong>{rows.length - 1} {rows.length - 1 === 1 ? "person" : "people"}</strong>. For each column in your file,
+              choose what it contains. We filled in what we could recognise; please check before importing.
+            </p>
             <ul className="queue">
               {rows[0].map((h, i) => (
                 <li key={i} className="row">
                   <span className="grow">
-                    {h} <span className="hint">e.g. {rows[1][i] || "—"}</span>
+                    {h} <span className="hint">Example: {rows[1][i] || "(empty)"}</span>
                   </span>
                   <select
-                    aria-label={`Column ${h}`}
+                    aria-label={`What the column "${h}" contains`}
                     value={targets[i]}
                     onChange={(e) => setTargets(targets.map((t, j) => (j === i ? (e.target.value as Target) : t)))}
                   >
-                    <option value="skip">ignore</option>
-                    <option value="email">email</option>
-                    <option value="name">name</option>
-                    <option value="group">tutor group</option>
+                    <option value="skip">Don&apos;t import this column</option>
+                    <option value="email">Email address</option>
+                    <option value="name">Full name</option>
+                    <option value="group">Tutor group</option>
                     {categories.map((c) => (
                       <option key={c} value={`category:${c}`}>
-                        points: {c}
+                        Starting points: {c}
                       </option>
                     ))}
                   </select>
@@ -308,7 +332,7 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
             </ul>
             <div className="row">
               <button type="button" className="primary" disabled={busy} onClick={() => void apply()}>
-                {busy ? "Importing…" : `Import ${rows.length - 1} people`}
+                {busy ? "Importing…" : `Import ${rows.length - 1} ${rows.length - 1 === 1 ? "person" : "people"}`}
               </button>
               <button type="button" disabled={busy} onClick={() => setRows(null)}>
                 Cancel
@@ -321,10 +345,10 @@ export function ImportExportPanel({ guildId }: { guildId: number }) {
       </section>
 
       <section className="panel">
-        <h2>Export results</h2>
-        <p className="hint">Everyone&apos;s points per category, total and tier, as a spreadsheet.</p>
+        <h2>Download results</h2>
+        <p className="hint">A spreadsheet of every member with their points per category, total points and level. Opens in Excel or Google Sheets.</p>
         <button type="button" className="primary" disabled={busy} onClick={() => void exportCsv()}>
-          Download CSV
+          Download spreadsheet
         </button>
       </section>
     </>

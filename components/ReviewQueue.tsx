@@ -58,12 +58,12 @@ export function ReviewQueue({ me }: { me: Me }) {
   }, [reload]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!items) return <p>Loading the queue…</p>;
+  if (!items) return <p>Loading submissions…</p>;
   if (items.length === 0)
     return (
       <div className="empty-state">
         <Icon name="inbox" size={40} />
-        <p>Nothing waiting for review. Nice work!</p>
+        <p>You&apos;re all caught up. New submissions will appear here.</p>
       </div>
     );
 
@@ -75,17 +75,17 @@ export function ReviewQueue({ me }: { me: Me }) {
     const { data, error } = await db().rpc("review_submissions", { p_ids: items.slice(0, 200).map((i) => i.id), p_approve: true });
     setBusy(false);
     const full = data?.filter((r) => r.result === "limit_reached").length ?? 0;
-    if (error) setNotice(`${friendly(error.message)} The list was refreshed, try again.`);
-    else if (full) setNotice(`${full} submission(s) skipped: ${friendly("limit_reached")}`);
+    if (error) setNotice(`${friendly(error.message)} The list has been refreshed; please try again.`);
+    else if (full) setNotice(`${full} ${full === 1 ? "submission was" : "submissions were"} skipped: ${friendly("limit_reached")}`);
     reload();
   };
 
   return (
     <>
       <div className="row">
-        <h2 className="grow">Waiting for review ({items.length})</h2>
+        <h2 className="grow">To review ({items.length})</h2>
         <button type="button" disabled={busy} onClick={() => void approveAll()}>
-          <Icon name="check" /> Approve all (min points)
+          <Icon name="check" /> Approve all at standard points
         </button>
       </div>
       {notice && <p className="error">{notice}</p>}
@@ -127,7 +127,7 @@ function QueueRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
         {item.note && <p className="note">“{item.note}”</p>}
         {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL */}
         {item.photo && <img className="proof" src={item.photo} alt={`Proof photo from ${item.who}`} />}
-        {item.dup && <p className="error">Same photo as another submission. Check before approving.</p>}
+        {item.dup && <p className="error">This photo was also used in another submission. Please check before approving.</p>}
       </div>
       {item.max > item.min && (
         <div className="stepper">
@@ -136,7 +136,7 @@ function QueueRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
             <input type="number" min={item.min} max={item.max} value={points} onChange={(e) => setPoints(Number(e.target.value))} />
           </label>
           {points > item.min && (
-            <input placeholder="Reason (required)" aria-label="Reason" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
+            <input placeholder="Why the extra points? (required)" aria-label="Reason for extra points" maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} />
           )}
         </div>
       )}

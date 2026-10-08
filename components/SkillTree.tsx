@@ -322,7 +322,7 @@ export function SkillTree({
         </div>
       </div>
 
-      <div className="tree-controls" role="group" aria-label="Map view">
+      <div className="tree-controls" role="group" aria-label="Map controls">
         <button type="button" aria-label="Zoom in" onClick={() => {
             glide();
             zoomAt(centerOf(viewport.current), 1.25);
@@ -335,7 +335,7 @@ export function SkillTree({
           }}>
           <Icon name="minus" />
         </button>
-        <button type="button" aria-label="Back to the centre" onClick={() => home(true)}>
+        <button type="button" aria-label="Back to the centre of the tree" onClick={() => home(true)}>
           <Icon name="target" />
         </button>
       </div>
@@ -353,7 +353,7 @@ const centerOf = (el: HTMLElement | null): Pt => {
   return { x: (r?.width ?? 0) / 2, y: (r?.height ?? 0) / 2 };
 };
 
-const SAY: Record<State, string> = { locked: "Secret, locked", open: "Open", pending: "Waiting for review", lit: "Done" };
+const SAY: Record<State, string> = { locked: "Secret task, locked", open: "Not done yet", pending: "Waiting for review", lit: "Completed" };
 
 function SkillNode({
   p,
@@ -380,7 +380,7 @@ function SkillNode({
   const style = { left: p.x, top: p.y, "--c": p.cat.color, "--on": readableOn(p.cat.color), "--delay": delay } as CSSProperties;
   if (n.locked) {
     return (
-      <div className={`tree-node locked${burst ? " burst" : ""}`} style={style} role="img" aria-label="Secret node, locked until the captain reveals it">
+      <div className={`tree-node locked${burst ? " burst" : ""}`} style={style} role="img" aria-label="Secret task, locked until the captain reveals it">
         <span className="tree-dot">
           <Icon name="keyhole" size={26} />
         </span>

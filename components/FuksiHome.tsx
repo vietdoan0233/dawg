@@ -31,7 +31,7 @@ export function FuksiHome({ me, bar }: { me: Me; bar: ReactNode }) {
     return (
       <div className="screen">
         {bar}
-        <div className="center-msg">{error ? <p className="error">{error}</p> : <p className="loading-rune">Unrolling your map…</p>}</div>
+        <div className="center-msg">{error ? <p className="error">{error}</p> : <p className="loading-rune">Loading your skill tree…</p>}</div>
       </div>
     );
   }
@@ -101,7 +101,7 @@ export function FuksiHome({ me, bar }: { me: Me; bar: ReactNode }) {
         </button>
         <button type="button" onClick={() => setPanel("ranks")}>
           <Icon name="trophy" size={22} />
-          <span>Ranks</span>
+          <span>Leaderboard</span>
         </button>
       </div>
 
@@ -109,7 +109,7 @@ export function FuksiHome({ me, bar }: { me: Me; bar: ReactNode }) {
       <div className="toasts" aria-live="polite">
         {sent > 0 && (
           <p key={`s${sent}`} className="toast">
-            <Icon name="send" size={18} /> Sent! Your reviewer will light it up.
+            <Icon name="send" size={18} /> Sent! The task lights up once it&apos;s approved.
           </p>
         )}
         {news && news.lit.length > 0 && (
@@ -119,12 +119,12 @@ export function FuksiHome({ me, bar }: { me: Me; bar: ReactNode }) {
         )}
         {away > 0 && (
           <p key={`a${news!.n}`} className="toast good">
-            <Icon name="sparkle" size={18} /> {away === 1 ? "1 node was" : `${away} nodes were`} approved while you were away!
+            <Icon name="sparkle" size={18} /> {away === 1 ? "1 task was" : `${away} tasks were`} approved while you were away!
           </p>
         )}
         {news && news.revealed.length > 0 && (
           <p key={`r${news.n}`} className="toast secret">
-            <Icon name="keyhole" size={18} /> A secret node was revealed!
+            <Icon name="keyhole" size={18} /> A secret task has been revealed!
           </p>
         )}
       </div>
@@ -155,10 +155,10 @@ export function FuksiHome({ me, bar }: { me: Me; bar: ReactNode }) {
       )}
 
       {panel && (
-        <Panel title={panel === "qr" ? "My check-in QR" : "Levels & ranks"} onClose={() => setPanel(null)}>
+        <Panel title={panel === "qr" ? "My check-in QR" : "Levels & leaderboard"} onClose={() => setPanel(null)}>
           {panel === "qr" ? (
             <>
-              <p className="hint">Show this to the organizer at the door. The node lights up when they scan it.</p>
+              <p className="hint">Show this code to the organizer at the event. The task lights up as soon as they scan it.</p>
               <MyCode guildId={me.guildId} />
             </>
           ) : (
@@ -195,22 +195,22 @@ function NodeInfo({ node, cat, onClose, onSubmit }: { node: OpenNode; cat: Categ
       </div>
       <p className={`status-line${node.pending ? " wait" : node.approved ? " done" : ""}`}>{nodeStatus(node)}</p>
       <h3 className="section-title">What to do</h3>
-      <p className="desc">{node.description ?? "Ask your tutor what counts for this node."}</p>
-      {node.requires_note && <p className="hint">Write the event&apos;s name when you submit.</p>}
+      <p className="desc">{node.description ?? "Ask your tutor what counts for this task."}</p>
+      {node.requires_note && <p className="hint">You&apos;ll need to write the event&apos;s name when you submit.</p>}
       {canSubmit ? (
         <>
           <button type="button" className="primary big" onClick={onSubmit}>
             <Icon name="send" /> Submit proof
           </button>
-          <p className="hint">Tip: double-tap a node to go straight to submitting.</p>
+          <p className="hint">Tip: double-tap a task on the tree to submit it straight away.</p>
         </>
       ) : node.pending > 0 ? (
         <p className="status-line wait">
-          <Icon name="clock" size={16} /> Sent. Waiting for your reviewer to light it up.
+          <Icon name="clock" size={16} /> Submitted. The task lights up once it&apos;s approved.
         </p>
       ) : (
         <p className="status-line done">
-          <Icon name="check" size={16} /> All done here!
+          <Icon name="check" size={16} /> You&apos;ve completed this task.
         </p>
       )}
     </aside>
@@ -226,7 +226,7 @@ function Hub({ map }: { map: Roadmap }) {
   const frac = next ? (map.total - from) / (next.min_total - from) : 1;
   const C = 2 * Math.PI * 78;
   return (
-    <div className="hub" aria-label={`${map.total} points${own ? `, ${own.name}` : ""}${next ? `, ${next.min_total - map.total} to ${next.name}` : ""}`}>
+    <div className="hub" aria-label={`${map.total} points${own ? `, ${own.name}` : ""}${next ? `, ${next.min_total - map.total} points to ${next.name}` : ""}`}>
       <svg viewBox="0 0 180 180" aria-hidden="true">
         <circle cx="90" cy="90" r="78" className="hub-track" />
         <circle cx="90" cy="90" r="78" className="hub-ring" strokeDasharray={`${C * frac} ${C}`} transform="rotate(-90 90 90)" />
@@ -234,7 +234,7 @@ function Hub({ map }: { map: Roadmap }) {
       <span className="hub-pts">{shown}</span>
       <span className="hub-unit">points</span>
       <span className="hub-tier">{own?.name ?? "Fuksi"}</span>
-      <span className="hub-next">{next ? `${next.min_total - map.total}p to ${next.name}` : "Legendary"}</span>
+      <span className="hub-next">{next ? `${next.min_total - map.total}p to ${next.name}` : "Max level"}</span>
     </div>
   );
 }

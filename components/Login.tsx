@@ -13,12 +13,17 @@ export function Login() {
 
   const send = async () => {
     const e = email.trim().toLowerCase();
-    if (!e.endsWith("@aalto.fi")) return setError("Use your @aalto.fi email address.");
+    if (!e.endsWith("@aalto.fi")) return setError("Please use your @aalto.fi email address.");
     setBusy(true);
     setError(null);
     const { error } = await db().auth.signInWithOtp({ email: e });
     setBusy(false);
-    if (error) setError(error.message);
+    if (error)
+      setError(
+        /rate limit|security purposes/i.test(error.message)
+          ? "Too many codes requested. Please wait a minute and try again."
+          : `We couldn't send the code. Check your email address and try again. (${error.message})`,
+      );
     else setSent(true);
   };
 
@@ -28,7 +33,12 @@ export function Login() {
     setError(null);
     const { error } = await db().auth.verifyOtp({ email: email.trim().toLowerCase(), token: code.trim(), type: "email" });
     setBusy(false);
-    if (error) setError(error.message);
+    if (error)
+      setError(
+        /expired|invalid/i.test(error.message)
+          ? "That code is wrong or has expired. Check the email or send a new code."
+          : `We couldn't log you in. Please try again. (${error.message})`,
+      );
   };
 
   return (
@@ -41,19 +51,20 @@ export function Login() {
     >
       <h2>Log in</h2>
       <label>
-        Aalto email
+        Your Aalto email
         <input type="email" autoComplete="email" required disabled={sent} placeholder="firstname.lastname@aalto.fi" value={email} onChange={(e) => setEmail(e.target.value)} />
       </label>
       {sent && (
         <label>
-          6-digit code from the email
+          Enter the 6-digit code we sent to your email
           <input inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required autoFocus value={code} onChange={(e) => setCode(e.target.value)} />
         </label>
       )}
+      {sent && !error && <p className="hint">Check your inbox (and spam folder) for the code.</p>}
       {error && <p className="error">{error}</p>}
       <div className="row">
         <button type="submit" className="primary" disabled={busy}>
-          {busy ? "…" : sent ? "Log in" : "Send code"}
+          {busy ? (sent ? "Checking…" : "Sending…") : sent ? "Log in" : "Send login code"}
         </button>
         {sent && (
           <button

@@ -26,11 +26,11 @@ const save = (key: string, q: Scan[]) => {
 };
 
 const LABEL: Record<string, string> = {
-  ok: "Checked in",
-  duplicate: "Already checked in",
-  limit_reached: "Node already full for this fuksi",
-  unknown: "Unknown code",
-  outside_window: "Outside the event time",
+  ok: "Checked in. Points added.",
+  duplicate: "Already checked in to this event.",
+  limit_reached: "This fuksi already has the maximum points for this task.",
+  unknown: "Code not recognised. Ask them to open their QR code again.",
+  outside_window: "Check-in for this event isn't open right now.",
 };
 
 type Detector = { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
@@ -142,7 +142,7 @@ export function Scanner({ guildId, memberId }: { guildId: number; memberId: numb
         }, 400);
       },
       (e: Error) => {
-        setError(`Camera: ${e.message}`);
+        setError(`The camera couldn't start (${e.message}). Check that the browser may use the camera, or type the code instead.`);
         setCamera(false);
       },
     );
@@ -155,18 +155,22 @@ export function Scanner({ guildId, memberId }: { guildId: number; memberId: numb
 
   const toggleCamera = () => {
     if (!camera && !window.BarcodeDetector)
-      return setError("This browser cannot scan QR codes. Type the code instead (or use Chrome on Android).");
+      return setError("This browser can't scan QR codes. Type the code shown under the QR instead, or use Chrome on Android.");
     setError(null);
     setCamera(!camera);
   };
 
   return (
     <section className="panel">
-      <h2>Check-in</h2>
+      <h2>Event check-in</h2>
+      <p className="hint">
+        Choose the event, then scan each fuksi&apos;s QR code. Their points are added right away. No signal? Keep scanning;
+        check-ins are saved on this phone and sent automatically when you&apos;re back online.
+      </p>
       <label>
         Event
         <select value={eventId ?? ""} onChange={(e) => setEventId(Number(e.target.value))}>
-          {events.length === 0 && <option value="">No events</option>}
+          {events.length === 0 && <option value="">No events yet</option>}
           {events.map((e) => (
             <option key={e.id} value={e.id}>
               {e.title} · {new Date(e.starts_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}
@@ -175,7 +179,7 @@ export function Scanner({ guildId, memberId }: { guildId: number; memberId: numb
         </select>
       </label>
       <button type="button" className="primary" disabled={!eventId} onClick={toggleCamera}>
-        {camera ? "Stop camera" : "Scan QR with camera"}
+        {camera ? "Stop camera" : "Scan QR code"}
       </button>
       {camera && <video ref={video} className="camera" muted playsInline />}
       <form
@@ -186,12 +190,16 @@ export function Scanner({ guildId, memberId }: { guildId: number; memberId: numb
           setManual("");
         }}
       >
-        <input className="grow" placeholder="…or type the code" aria-label="Member code" value={manual} onChange={(e) => setManual(e.target.value)} />
+        <input className="grow" placeholder="Or type the code shown under the QR" aria-label="Member code" value={manual} onChange={(e) => setManual(e.target.value)} />
         <button type="submit" disabled={!eventId || !manual.trim()}>
-          Add
+          Check in
         </button>
       </form>
-      {queued > 0 && <p className="hint">{queued} scan(s) waiting for a connection…</p>}
+      {queued > 0 && (
+        <p className="hint">
+          {queued} {queued === 1 ? "check-in is" : "check-ins are"} saved on this phone and will be sent when you&apos;re back online.
+        </p>
+      )}
       {error && <p className="error">{error}</p>}
       <ul className="results" aria-live="polite">
         {results.map((r) => (

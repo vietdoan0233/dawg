@@ -33,16 +33,20 @@ export function RevealPanel({ guildId }: { guildId: number }) {
     reload();
   };
 
-  if (!secrets?.length && !error) return null;
+  if (!secrets) return error ? <p className="error">{error}</p> : null;
   return (
     <section className="panel">
       <h2>
-        <Icon name="keyhole" /> Secret nodes
+        <Icon name="keyhole" /> Secret tasks
       </h2>
-      <p className="hint">Revealing unlocks the node on every phone and the projector within 5 seconds.</p>
+      <p className="hint">
+        Secret tasks stay hidden until you reveal them. Once revealed, they unlock for every fuksi and on the projector within
+        a few seconds. This can&apos;t be undone.
+      </p>
+      {secrets.length === 0 && !error && <p className="hint">No secret tasks left to reveal.</p>}
       {error && <p className="error">{error}</p>}
       <ul className="queue">
-        {secrets?.map((s) => (
+        {secrets.map((s) => (
           <li key={s.id} className="row">
             <span className="grow">{s.title}</span>
             <button type="button" className="primary" onClick={() => void reveal(s.id)}>

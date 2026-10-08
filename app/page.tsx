@@ -15,7 +15,7 @@ export default function Home() {
     return (
       <div className="screen">
         <div className="center-msg">
-          <p className="loading-rune">Loading…</p>
+          <p className="loading-rune">Loading your guild…</p>
         </div>
       </div>
     );
@@ -29,13 +29,13 @@ export default function Home() {
           <div className="hero">
             <Icon name="crown" size={44} />
             <h1>Fuksipisteet</h1>
-            <p>Your fuksi year as a skill tree. Go to events, light up nodes, climb to Teekkari.</p>
+            <p>Your fuksi year as a skill tree. Join events, complete tasks and earn points on your way to becoming a Teekkari.</p>
           </div>
           {error ? (
             <div className="panel">
               <p className="error">{error}</p>
               {/* logged in, but not (yet) in a guild: joining needs the captain's invite link */}
-              {error.includes("not a member") && <p className="hint">Ask your guild captain for an invite link.</p>}
+              {error.includes("not a member") && <p className="hint">To join, open the invite link from your guild captain. If you don&apos;t have one, ask them for it.</p>}
               <button type="button" onClick={() => void db().auth.signOut()}>
                 Log out
               </button>

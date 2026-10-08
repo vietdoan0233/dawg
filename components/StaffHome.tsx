@@ -16,7 +16,7 @@ export function StaffHome({ me, bar }: { me: Me; bar: ReactNode }) {
   const tabs: Tab[] = [
     { id: "review", label: "Review", icon: "inbox", show: me.role !== "organizer", body: () => <ReviewQueue me={me} /> },
     { id: "scan", label: "Check-in", icon: "scan", show: true, body: () => <Scanner guildId={me.guildId} memberId={me.memberId} /> },
-    { id: "ranks", label: "Ranks", icon: "trophy", show: true, body: () => <Leaderboard guildId={me.guildId} /> },
+    { id: "ranks", label: "Leaderboard", icon: "trophy", show: true, body: () => <Leaderboard guildId={me.guildId} /> },
     { id: "secrets", label: "Secrets", icon: "keyhole", show: me.role === "captain", body: () => <RevealPanel guildId={me.guildId} /> },
     {
       id: "people",
@@ -32,7 +32,7 @@ export function StaffHome({ me, bar }: { me: Me; bar: ReactNode }) {
     },
     {
       id: "import-export",
-      label: "Import/Export",
+      label: "Import / Export",
       icon: "download",
       show: me.role === "captain",
       body: () => <ImportExportPanel guildId={me.guildId} />,

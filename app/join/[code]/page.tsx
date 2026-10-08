@@ -31,8 +31,9 @@ export default function JoinPage({ params }: { params: Promise<{ code: string }>
       <header className="top">
         <h1>Join your guild</h1>
       </header>
+      {signedIn === false && <p className="hint">Log in with your Aalto email to accept the invite.</p>}
       {signedIn === false && <Login />}
-      {signedIn && !error && <p>Joining…</p>}
+      {signedIn && !error && <p>Joining your guild…</p>}
       {error && (
         <div className="panel">
           <p className="error">{error}</p>

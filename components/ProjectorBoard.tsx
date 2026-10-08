@@ -25,18 +25,18 @@ export function ProjectorBoard({ guildId, guildName }: { guildId: number; guildN
           <div className="hub guild-hub">
             <Icon name="shield" size={40} />
             <span className="hub-tier">{guildName}</span>
-            <span className="hub-next">{secrets ? `${secrets} secret${secrets > 1 ? "s" : ""} still locked` : "All secrets revealed"}</span>
+            <span className="hub-next">{secrets ? `${secrets} secret task${secrets > 1 ? "s" : ""} left` : "All secrets revealed"}</span>
           </div>
         }
       />
       <aside className="board-side">
         <h2>
-          <Icon name="trophy" /> Tutor groups <span className="live">live</span>
+          <Icon name="trophy" /> Group leaderboard <span className="live">Live</span>
         </h2>
         <Leaderboard guildId={guildId} />
         {news && news.revealed.length > 0 && (
           <p key={news.n} className="toast secret">
-            <Icon name="keyhole" size={18} /> A secret node was revealed!
+            <Icon name="keyhole" size={18} /> A secret task has been revealed!
           </p>
         )}
       </aside>

@@ -18,7 +18,8 @@ async function fetchMe(wanted?: number): Promise<{ me: Me; guilds: GuildRef[] }>
   const client = db();
   const list = await client.from("guilds").select("id, name").order("id");
   if (list.error) throw new Error(list.error.message);
-  if (list.data.length === 0) throw new Error("This account is not a member of any guild.");
+  // app/page.tsx shows the invite hint when this message contains "not a member"
+  if (list.data.length === 0) throw new Error("You're logged in, but you're not a member of any guild yet.");
   const guild = list.data.find((g) => g.id === wanted) ?? list.data[0];
   const map = await loadRoadmap(guild.id); // the caller's own member id comes from roadmap()
   const member = await client.from("members").select("id, display_name, role").eq("id", map.member_id).single();

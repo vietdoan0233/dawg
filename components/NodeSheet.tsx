@@ -13,9 +13,9 @@ export const nodeStatus = (node: OpenNode) =>
       ? "Waiting for review"
       : node.approved > 0
         ? `Done ${node.approved}× · you can do it again`
-        : "Open") +
+        : "Not done yet") +
   (node.max_repeats > 1 ? ` · ${node.approved}/${node.max_repeats}` : "") +
-  ` · reviewed by ${node.reviewer}`;
+  (node.reviewer === "tutor" ? " · checked by your tutor" : " · checked by the captain");
 
 // SDD: redraw the photo on a canvas as a JPEG, longest side ≤1600 px. The canvas copies only pixels,
 // so EXIF (GPS, device, time) never leaves the phone. Orientation is applied before it is dropped.
@@ -62,8 +62,8 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
 
   const submit = async () => {
     if (busy) return; // the button stays enabled, so ignore a double tap while sending
-    if (node.requires_note && !note.trim()) return setError({ field: "note", text: "Write the event name so your reviewer knows what it was." });
-    if (node.requires_photo && !photo) return setError({ field: "photo", text: "This node needs a photo." });
+    if (node.requires_note && !note.trim()) return setError({ field: "note", text: "Write the event name so your reviewer knows which event it was." });
+    if (node.requires_photo && !photo) return setError({ field: "photo", text: "This task needs a photo." });
     setBusy(true);
     setError(null);
     try {
@@ -139,7 +139,7 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
                 value={note}
                 maxLength={500}
                 rows={3}
-                placeholder={node.requires_note ? "Which event was it?" : "What did you do? A funny story helps."}
+                placeholder={node.requires_note ? "Which event did you go to?" : "What did you do? A short story helps your reviewer."}
                 aria-invalid={error?.field === "note"}
                 onChange={(e) => setNote(e.target.value)}
               />
@@ -172,7 +172,7 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
                 {error.text}
               </p>
             )}
-            <p className="hint">Never upload transcripts or ID documents.</p>
+            <p className="hint">Don&apos;t upload transcripts, ID cards or other personal documents.</p>
           </>
         )}
 
@@ -185,7 +185,7 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
         <div className="sheet-actions">
           {canSubmit ? (
             <button type="submit" className="primary big" aria-busy={busy}>
-              <Icon name="send" /> {busy ? "Sending…" : "Submit"}
+              <Icon name="send" /> {busy ? "Sending…" : "Submit proof"}
             </button>
           ) : (
             <button type="button" className="big" onClick={onClose}>

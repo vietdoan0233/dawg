@@ -101,19 +101,19 @@ export async function loadLeaderboard(guildId: number): Promise<LeaderRow[]> {
 
 // RPC errors carry short codes (see 0001_init.sql); show a sentence instead.
 const MESSAGES: Record<string, string> = {
-  limit_reached: "You have already used every repeat of this node.",
-  note_required: "This node needs a note.",
-  photo_required: "This node needs a photo.",
-  invalid_photo: "That photo could not be attached. Try again.",
-  unauthenticated: "Please log in again.",
-  invalid_invite: "This invite link is not valid any more. Ask your captain for a new one.",
-  email_unverified: "Verify your email first: log in with the 6-digit code.",
-  cannot_change_self: "You cannot change your own role. Ask another captain.",
-  invalid_request: "That request is not valid.",
-  not_found: "This node is not available.",
-  forbidden: "You are not allowed to do that.",
-  not_pending: "That submission was already reviewed.",
-  reason_required: "Add a short reason when awarding above the minimum.",
-  points_out_of_range: "Points are outside this node's range.",
+  limit_reached: "This task has already been completed the maximum number of times.",
+  note_required: "This task needs a short note.",
+  photo_required: "This task needs a photo.",
+  invalid_photo: "The photo could not be attached. Please try again.",
+  unauthenticated: "Your session has ended. Please log in again.",
+  invalid_invite: "This invite link has expired or been turned off. Ask your guild captain for a new one.",
+  email_unverified: "Please confirm your email first by logging in with the 6-digit code.",
+  cannot_change_self: "You can't change your own role. Ask another captain to do it.",
+  invalid_request: "Something in that request wasn't right. Please check and try again.",
+  not_found: "This task isn't available.",
+  forbidden: "You don't have permission to do that.",
+  not_pending: "Someone has already reviewed this submission.",
+  reason_required: "Please add a short reason when giving more than the standard points.",
+  points_out_of_range: "Those points are outside this task's allowed range.",
 };
 export const friendly = (message: string) => MESSAGES[message] ?? message;
