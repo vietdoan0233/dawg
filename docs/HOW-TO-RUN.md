@@ -97,6 +97,16 @@ Pick a person under **"Choose your character"** to try the app as a fuksi, tutor
 - Leave the terminal window open while you use the app. Closing it stops the app.
 - If the app asks for a login code sent by email: no real email is sent. Open **http://127.0.0.1:54324** to see the code.
 
+### Optional: fill the app with a crowd (good for a pitch)
+
+Out of the box only 3 fuksis exist, so the leaderboard looks empty. To add 48 made-up fuksis in 6 tutor groups, with
+5 weeks of approved proofs, check-ins and proofs waiting for review, open a **second** terminal in the app folder and run:
+```
+npm run demo:crowd
+```
+It prints the tutor-group scores when it is done. Nobody in the crowd is a real person. To remove the crowd, run
+`npx supabase db reset`.
+
 ---
 
 ## Next time you want to use it

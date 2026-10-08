@@ -15,7 +15,7 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 | 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Done**, in `main`: roster import (AI column mapping, headers only), results export, reveal, UI polish |
 | UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
-**Next up: pitch day.** All 5 slices are in `main` (2026-10-08). The 3-minute demo was clicked through in Chrome on the final code: photo submit → tutor approves → check-in → captain reveals → projector. Before the pitch run `npx supabase db reset` once for fresh demo data; demo events stay open for 60 days after that.
+**Next up: pitch day.** All 5 slices are in `main` (2026-10-08). The 3-minute demo was clicked through in Chrome on the final code: photo submit → tutor approves → check-in → captain reveals → projector. Before the pitch run `npx supabase db reset` once for fresh demo data; demo events stay open for 60 days after that. Then `npm run demo:crowd` adds 48 made-up fuksis in 6 tutor groups so the leaderboard, review queues and tracks look busy (`supabase/demo-crowd.sql`).
 
 Slices 1–4 prototypes and the UI are merged into `main`; they went in without PRs.
 Database tests: 9 files, 241/241 pass on `slice/3-4-hardening` (`supabase db reset` + `supabase test db`, 2026-10-08).

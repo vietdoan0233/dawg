@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "demo": "node --env-file=.env.demo node_modules/next/dist/bin/next dev",
+    "demo:crowd": "docker exec -i supabase_db_dawg psql -U postgres -v ON_ERROR_STOP=1 -q < supabase/demo-crowd.sql",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
