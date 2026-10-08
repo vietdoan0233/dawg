@@ -2,7 +2,7 @@
 -- Per-visitor demo rooms: every visitor of the public demo gets their own copy of the demo guild, so people who
 -- scan the same QR code never see (or break) each other's clicks. The copy has its own 7 demo users
 -- (demo.s<n>.<role>@demo.invalid, password 'demo-password', like seed.sql), the same tasks/tiers/rules, fresh
--- events and a copy of the crowd from demo-crowd.sql. Demo Fuksi 3 stays empty.
+-- events and a copy of the crowd from demo-crowd.sql. All 7 demo characters start empty (0 points); only the crowd keeps its history.
 -- The rooms are separate for convenience, not secrecy: anyone who guesses a room number can log in to it, the same
 -- as the shared demo users today.
 -- Run after `npx supabase db reset` (+ `npm run demo:crowd`):  npm run demo:sandbox   (safe to run again)
@@ -117,7 +117,7 @@ begin
   select g, s, regexp_replace(om.email::text, '^crowd\.', 'crowd.' || v_tag || '.'), om.display_name, om.role
     from public.members om where om.guild_id = tg and om.season_id = ts and om.email::text like 'crowd.%' order by om.id;
 
-  -- history of the crowd and Demo Fuksi 1/2 (not 3). Members map by email; a reviewer/creator outside the copy
+  -- history of the crowd only (every demo character starts at 0). Members map by email; a reviewer/creator outside the copy
   -- becomes null. Photos are not copied.
   insert into public.submissions (guild_id, season_id, task_id, category_id, member_id, event_id, status, points_awarded,
                                   award_reason, note, reviewed_by, reviewed_at, created_at)
@@ -132,7 +132,7 @@ begin
     left join public.members nr on nr.guild_id = g and nr.season_id = s
      and nr.email::text = regexp_replace(orv.email::text, '^(demo|crowd)\.', '\1.' || v_tag || '.')
    where x.guild_id = tg and x.season_id = ts
-     and (om.email::text like 'crowd.%' or om.email::text in ('demo.fuksi.1@demo.invalid', 'demo.fuksi.2@demo.invalid'))
+     and om.email::text like 'crowd.%'
    order by x.id;
 
   insert into public.adjustments (guild_id, season_id, member_id, category_id, points, reason, created_by, created_at)
@@ -147,7 +147,7 @@ begin
     left join public.members nb on nb.guild_id = g and nb.season_id = s
      and nb.email::text = regexp_replace(ob.email::text, '^(demo|crowd)\.', '\1.' || v_tag || '.')
    where a.guild_id = tg and a.season_id = ts
-     and (om.email::text like 'crowd.%' or om.email::text in ('demo.fuksi.1@demo.invalid', 'demo.fuksi.2@demo.invalid'))
+     and om.email::text like 'crowd.%'
    order by a.id;
 
   return v_n;
