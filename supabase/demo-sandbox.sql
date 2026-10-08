@@ -132,7 +132,7 @@ begin
     left join public.members nr on nr.guild_id = g and nr.season_id = s
      and nr.email::text = regexp_replace(orv.email::text, '^(demo|crowd)\.', '\1.' || v_tag || '.')
    where x.guild_id = tg and x.season_id = ts
-     and om.email::text like 'crowd.%'
+     and om.email::text like 'crowd.%' and x.status <> 'pending' -- the review queue starts empty in every room
    order by x.id;
 
   insert into public.adjustments (guild_id, season_id, member_id, category_id, points, reason, created_by, created_at)
