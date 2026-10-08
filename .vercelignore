@@ -1,0 +1,10 @@
+.env*
+!.env.example
+.git
+.claude
+.next
+node_modules
+supabase/.temp
+pitch-screenshots
+Task *.png
+try-the-app-qr.png
