@@ -1,6 +1,6 @@
 # Fuksipisteet progress
 
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 ## The plan in one picture
 
@@ -12,13 +12,13 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 | 2. Auth & hardening | Real email login, invites, roles, more security tests | **Done**, in `main`. Needs production email + auth hooks before a pilot |
 | 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype**, in `main`. See shortcuts below |
 | 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype**, in `main`. No 30-day purge, the server doesn't compute the photo hash |
-| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Reveal done**, **UI polish done**. Import/export **fixes in progress** (migration 0005 adds auth, case-insensitive matching, duplicate prevention, proper CSV parsing, role restrictions, formula-safe export) |
+| 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Done** on branch `slice/5-import-export-finish`: roster import (AI column mapping, headers only), results export, reveal, UI polish |
 | UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
-**Next up:** slice 5 import/export, then hardening the slice 3–4 prototypes (see the shortcut list).
+**Next up:** hardening the slice 3–4 prototypes (see the shortcut list).
 
 Everything is merged into `main` and pushed; the merged branches are deleted. They went in without PRs.
-Database tests: 7 files, 200/200 pass (last run for slice 2, 2026-10-06). Not re-run since the seed changed (2026-10-07).
+Database tests: 8 files, 214/214 pass (`supabase db reset` + `supabase test db`, 2026-10-08).
 
 ## Slice 1: walking skeleton (merged)
 
@@ -103,39 +103,28 @@ Locally, login emails go to the test inbox at http://127.0.0.1:54324 (nothing is
   buttons off-screen); staff tabs scrolled sideways (Secrets/People/Projector hidden) and now fit as icon + label;
   welcome cards show two per row. Desktop unchanged. CSS only (`app/globals.css`).
 
-## Slice 5: import/export fixes (in progress)
+## Slice 5: import/export (built 2026-10-08)
 
-**Working on: fix import/export security and functionality (2026-10-07)**
+The first push (0004/0005, two edge functions, two Next API routes) did not work end to end: the browser sent no
+token, the functions never called `Deno.serve`, `import_apply` ran as the service role (so always `forbidden`),
+field names and NOT NULL defaults mismatched, and `import_history` had no RLS (any user could read every guild's rows).
+Its pgTAP file failed 17/18. Rebuilt smaller:
 
-Branch: `slice/5-import-export-fixes` (from `origin/main` commit 701d803).
+- **Import** (captain, Import/Export tab): pick a CSV (comma or Finnish-Excel `;`). The browser parses it and guesses
+  each column (email / name / tutor group / points per category, Finnish headers too). Only the *unknown column
+  headers* go to the `map-columns` edge function (Claude Haiku, 20 calls/day per user via `ai_usage`); never a cell
+  value. The captain checks every column in a dropdown, then `import_apply` runs with the captain's own login.
+  Without `ANTHROPIC_API_KEY` the AI step is skipped and the captain sets the unknown columns by hand.
+- **Re-import is safe**: existing people, categories, tasks, tiers, rules and opening balances are skipped, not doubled.
+  Roster rows always join as fuksi; a `role` column is ignored (staff roles stay under People). Emails must be @aalto.fi.
+- **Export**: built in the browser from what the captain can already read: name, role, tutor group, points per
+  category, total, tier. Text starting with `= + - @` gets a `'` (formula injection); numbers stay numbers.
+- Migration `0006_import_apply_fix.sql`: drops `import_history` and the unused `csv_escape_formula`, rewrites
+  `import_apply`. No service-role key outside `supabase/functions/*`; the Next API routes are gone.
+- Tests: `08_import.test.sql` (14), `node scripts/check-csv.mjs`. Clicked through in Chrome as Demo Captain.
 
-Fixed issues:
-1. **Authentication & authorization**: API routes now validate Bearer tokens and pass them to Edge Functions; Edge Functions verify JWT and check captain role before processing.
-2. **Import confirmation end-to-end**: Mapping and confirm fields preserved through API route → Edge Function → RPC flow.
-3. **Export data accuracy**: Now calls the `progress` view to return actual per-category points and calls `member_tier` for each member's tier (not hardcoded zeros).
-4. **Duplicate import prevention**: New `import_history` table tracks successful imports by guild+season; repeat imports rejected with `import_already_applied` error.
-5. **CSV parsing**: Proper quoted-field handling, type conversion for numeric fields, boolean parsing for flags.
-6. **Case-insensitive matching**: Categories and tiers matched by `lower(name)` in import_apply; allows "TestCategory" CSV column to match "testcategory" imported data.
-7. **Role restrictions**: Imported members always assigned 'fuksi' role; staff roles must use `set_role` RPC to prevent privilege escalation.
-8. **Formula-safe export**: Category names and data cells in CSV escaped with leading `'` if they start with `=`, `+`, `-`, `@`, tab, or carriage return.
-
-Added:
-- Migration `0005_import_fixes.sql`: Rewrites `import_apply` with all fixes, adds `import_history` table and index.
-- Test file `08_import_fixes.test.sql`: 18 pgTAP tests covering import auth, duplicate prevention, case-insensitive matching, role assignment, member/adjustment mapping, formula escaping.
-- Updated `app/api/import/route.ts` and `app/api/export/route.ts`: Bearer token validation, full request body forwarding.
-- Rewritten `supabase/functions/import/index.ts`: JWT verification, captain check, proper CSV parsing, organized data structure.
-- Rewritten `supabase/functions/export/index.ts`: JWT verification, captain check, progress/member_tier view queries, escaped CSV output.
-- Updated `tsconfig.json`: Excluded `supabase/functions` from Next.js TypeScript checking (Deno/SDK conflicts).
-
-Build status:
-- `npm run lint`: ✓ Pass
-- `npm run build`: ✓ Pass
-- `supabase db reset`: Requires Docker (not available in this environment; tests ready to run when Docker is available)
-
-**Pending:**
-- Lane A migration review of 0005_import_fixes.sql (role restriction, duplicate prevention, case-insensitive matching).
-- Teammate agent review before merge to `main`.
-- Test execution once Docker/local Supabase is available.
+**Before a pilot:** `supabase secrets set ANTHROPIC_API_KEY=...` and `supabase functions deploy map-columns`.
+The AI call itself was not exercised locally (no key here); the no-key fallback was.
 
 ## What you need to do
 
@@ -147,7 +136,7 @@ Build status:
 - [x] Merge everything into `main` and delete the merged branches.
 - [ ] Get a teammate's review of what's in `main` (it skipped PRs).
 - [ ] Set up production email + auth hooks (see "Before a real pilot" above).
-- [ ] **Slice 5 import/export**: Lane A review of migration 0005, then teammate agent review, then test with Docker and merge.
+- [ ] **Slice 5**: teammate review of `slice/5-import-export-finish`, then merge. Set `ANTHROPIC_API_KEY` as a function secret.
 
 ## Known gaps, to fix in later slices
 

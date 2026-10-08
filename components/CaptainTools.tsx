@@ -1,6 +1,7 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { db } from "@/lib/supabase";
+import { guessTarget, parseCsv, toCsv, type Target } from "@/lib/csv";
 import { friendly } from "@/lib/roadmap";
 import type { Me, Role } from "@/lib/useMe";
 
@@ -131,184 +132,199 @@ export function RolesPanel({ me }: { me: Me }) {
   );
 }
 
+const MAX_ROWS = 2000;
+// PostgREST returns at most 1000 rows per request (config.toml max_rows): fetch page by page.
+async function everyRow<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+  const rows: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await page(from, from + 999);
+    if (error) throw new Error(error.message);
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < 1000) return rows;
+  }
+}
+const download = (name: string, text: string) => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+// Roster import (email, name, tutor group, opening points per category) and results export, both in the browser.
+// Only column headers ever leave it, for AI mapping (map-columns); the rows go straight to import_apply.
 export function ImportExportPanel({ guildId }: { guildId: number }) {
-  const [importing, setImporting] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [rows, setRows] = useState<string[][] | null>(null);
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [importPreview, setImportPreview] = useState<Record<string, unknown>[] | null>(null);
-  const [importMapping, setImportMapping] = useState<Record<string, string> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [csvContent, setCsvContent] = useState<string | null>(null);
+  useEffect(() => {
+    db()
+      .from("categories")
+      .select("name")
+      .eq("guild_id", guildId)
+      .order("id")
+      .then(({ data, error }) => (error ? setError(error.message) : setCategories(data.map((c) => c.name))));
+  }, [guildId]);
 
-  const handleImportFile = async (file: File) => {
+  const pick = async (file: File) => {
     setError(null);
-    setImporting(true);
-    try {
-      const content = await file.text();
-      setCsvContent(content);
-
-      // Step 1: Get mapping preview
-      const response = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guild_id: guildId, csv_content: content }),
+    setNote(null);
+    if (file.size > 1_000_000) return setError("That file is over 1 MB. Export only the roster sheet as CSV.");
+    const parsed = parseCsv(await file.text());
+    if (parsed.length < 2) return setError("The file needs a header row and at least one person.");
+    if (parsed.length - 1 > MAX_ROWS) return setError(`At most ${MAX_ROWS} people per import.`);
+    if (parsed[0].some((h) => h.includes("@"))) return setError("The first row must be column names, not a person.");
+    setBusy(true);
+    const guesses = parsed[0].map((h) => guessTarget(h, categories));
+    const unknown = parsed[0].filter((_, i) => !guesses[i]);
+    let ai: Record<string, Target> = {};
+    if (unknown.length) {
+      const { data } = await db().functions.invoke<{ mapping: Record<string, Target> }>("map-columns", {
+        body: { guild_id: guildId, headers: unknown, categories },
       });
-      const result = (await response.json()) as {
-        status: string;
-        preview?: Record<string, unknown>[];
-        mapping?: Record<string, string>;
-        message?: string;
-      };
-      if (result.status === "error") {
-        setError(result.message || "Import failed");
-      } else {
-        setImportPreview(result.preview || []);
-        setImportMapping(result.mapping || {});
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Import failed");
-    } finally {
-      setImporting(false);
+      if (data) ai = data.mapping;
+      else setNote("No AI suggestions right now; set the unknown columns yourself.");
     }
+    setBusy(false);
+    setRows(parsed);
+    setTargets(parsed[0].map((h, i) => guesses[i] ?? ai[h] ?? "skip"));
   };
 
-  const handleApplyImport = async () => {
-    if (!importMapping || !csvContent) return;
+  const apply = async () => {
+    if (!rows) return;
     setError(null);
-    setImporting(true);
-    try {
-      // Step 2: Apply with confirmed mapping
-      const response = await fetch("/api/import", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          guild_id: guildId,
-          csv_content: csvContent,
-          mapping: importMapping,
-          confirm: true,
-        }),
-      });
-      const result = (await response.json()) as { status: string; message?: string };
-      if (result.status === "error") {
-        setError(result.message || "Import application failed");
-      } else {
-        setError("Import completed successfully!");
-        setImportPreview(null);
-        setImportMapping(null);
-        setCsvContent(null);
+    setNote(null);
+    const col = (t: Target) => targets.indexOf(t);
+    if (targets.filter((t) => t === "email").length !== 1) return setError("Pick exactly one email column.");
+    const people = rows.slice(1);
+    const members = people.map((r) => ({
+      email: r[col("email")],
+      display_name: col("name") >= 0 ? r[col("name")] : "",
+      tutor_group_name: col("group") >= 0 ? r[col("group")] : null,
+    }));
+    const adjustments: { email: string; category_name: string; points: number }[] = [];
+    for (const [n, r] of people.entries())
+      for (const [i, t] of targets.entries()) {
+        if (!t.startsWith("category:") || !r[i]) continue;
+        const points = Number(r[i]);
+        if (!Number.isInteger(points)) return setError(`Row ${n + 2}: "${r[i]}" under ${rows[0][i]} is not a whole number.`);
+        adjustments.push({ email: r[col("email")], category_name: t.slice("category:".length), points });
       }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Import application failed");
-    } finally {
-      setImporting(false);
-    }
+    setBusy(true);
+    const { data, error } = await db().rpc("import_apply", {
+      p_guild_id: guildId,
+      p_categories: [],
+      p_tasks: [],
+      p_tiers: [],
+      p_rules: [],
+      p_members: members,
+      p_adjustments: adjustments,
+    });
+    setBusy(false);
+    if (error) return setError(friendly(error.message));
+    const done = data as { members: number; adjustments: number };
+    setNote(`Imported ${done.members} people and ${done.adjustments} opening balances. Send them an invite link to join.`);
+    setRows(null);
   };
 
-  const handleExport = async () => {
+  const exportCsv = async () => {
     setError(null);
-    setExporting(true);
+    setBusy(true);
+    const c = db();
+    // progress/member_tier have no guild_id; rows of the caller's other guilds are dropped by the member lookup below
+    const all = Promise.all([
+      everyRow((a, b) => c.from("members").select("id, display_name, role, tutor_group_id").eq("guild_id", guildId).order("display_name").order("id").range(a, b)),
+      everyRow((a, b) => c.from("categories").select("id, name").eq("guild_id", guildId).order("id").range(a, b)),
+      everyRow((a, b) => c.from("tutor_groups").select("id, name").eq("guild_id", guildId).order("id").range(a, b)),
+      everyRow((a, b) => c.from("tiers").select("id, name").eq("guild_id", guildId).order("id").range(a, b)),
+      everyRow((a, b) => c.from("progress").select("member_id, category_id, points").order("member_id").order("category_id").range(a, b)),
+      everyRow((a, b) => c.from("member_tier").select("member_id, tier_id").order("member_id").range(a, b)),
+    ]);
+    let data: Awaited<typeof all>;
     try {
-      const response = await fetch("/api/export", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ guild_id: guildId }),
-      });
-      const result = (await response.json()) as { status: string; csv?: string; message?: string };
-      if (result.status === "error") {
-        setError(result.message || "Export failed");
-      } else if (result.csv) {
-        // Download CSV
-        const blob = new Blob([result.csv], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `export-${new Date().toISOString().split("T")[0]}.csv`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
+      data = await all;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Export failed");
+      return setError((e as Error).message);
     } finally {
-      setExporting(false);
+      setBusy(false);
     }
+    const [m, cats, g, t, p, mt] = data;
+    const pts = new Map(p.map((r) => [`${r.member_id}:${r.category_id}`, r.points ?? 0]));
+    const tierOf = new Map(mt.map((r) => [r.member_id, t.find((x) => x.id === r.tier_id)?.name ?? ""]));
+    const group = new Map(g.map((x) => [x.id, x.name]));
+    const header = ["name", "role", "tutor group", ...cats.map((x) => x.name), "total", "tier"];
+    const body = m.map((x) => {
+      const per = cats.map((cat) => pts.get(`${x.id}:${cat.id}`) ?? 0);
+      const total = per.reduce((a, b) => a + b, 0);
+      return [x.display_name, x.role, group.get(x.tutor_group_id ?? -1) ?? "", ...per, total, tierOf.get(x.id) ?? ""];
+    });
+    download(`fuksipisteet-${new Date().toISOString().slice(0, 10)}.csv`, toCsv([header, ...body]));
   };
 
   return (
     <>
       <section className="panel">
-        <h2>Import</h2>
-        <p className="hint">Upload a CSV with categories, tasks, tiers, members, and opening balances.</p>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".csv"
-          onChange={(e) => e.target.files?.[0] && void handleImportFile(e.target.files[0])}
-          disabled={importing}
-          style={{ display: "none" }}
-        />
-        <button
-          type="button"
-          className="primary"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={importing || !!importPreview}
-        >
-          {importing ? "Processing..." : "Choose CSV file"}
-        </button>
-        {error && <p className="error">{error}</p>}
-        {importPreview && (
+        <h2>Import roster</h2>
+        <p className="hint">
+          A CSV with one person per row: email, name, tutor group, and optionally a column per category with points they
+          already have. Re-importing the same file is safe. Everyone joins as a fuksi; set staff roles under People.
+        </p>
+        {!rows && (
+          <label className="row">
+            {busy ? "Reading…" : "CSV file"}
+            <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(e) => e.target.files?.[0] && void pick(e.target.files[0])} />
+          </label>
+        )}
+        {rows && (
           <>
-            <h3>Preview</h3>
-            <p className="hint">Column mapping detected by AI. Review before applying.</p>
-            <div style={{ overflowX: "auto", marginBottom: "1rem" }}>
-              <table style={{ fontSize: "0.875rem" }}>
-                <thead>
-                  <tr>
-                    {Object.keys(importPreview[0] || {}).map((k) => (
-                      <th key={k}>{k}</th>
+            <p className="hint">{rows.length - 1} people. Check what each column means:</p>
+            <ul className="queue">
+              {rows[0].map((h, i) => (
+                <li key={i} className="row">
+                  <span className="grow">
+                    {h} <span className="hint">e.g. {rows[1][i] || "—"}</span>
+                  </span>
+                  <select
+                    aria-label={`Column ${h}`}
+                    value={targets[i]}
+                    onChange={(e) => setTargets(targets.map((t, j) => (j === i ? (e.target.value as Target) : t)))}
+                  >
+                    <option value="skip">ignore</option>
+                    <option value="email">email</option>
+                    <option value="name">name</option>
+                    <option value="group">tutor group</option>
+                    {categories.map((c) => (
+                      <option key={c} value={`category:${c}`}>
+                        points: {c}
+                      </option>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {importPreview.map((row, i) => (
-                    <tr key={i}>
-                      {Object.values(row).map((v, j) => (
-                        <td key={j}>{String(v)}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </select>
+                </li>
+              ))}
+            </ul>
+            <div className="row">
+              <button type="button" className="primary" disabled={busy} onClick={() => void apply()}>
+                {busy ? "Importing…" : `Import ${rows.length - 1} people`}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setRows(null)}>
+                Cancel
+              </button>
             </div>
-            <details style={{ marginBottom: "1rem" }}>
-              <summary>Detected column mapping</summary>
-              <pre style={{ fontSize: "0.75rem", whiteSpace: "pre-wrap" }}>{JSON.stringify(importMapping, null, 2)}</pre>
-            </details>
-            <button type="button" className="primary" onClick={handleApplyImport} disabled={importing}>
-              {importing ? "Applying..." : "Apply import"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setImportPreview(null);
-                setImportMapping(null);
-                setCsvContent(null);
-                if (fileInputRef.current) fileInputRef.current.value = "";
-              }}
-            >
-              Cancel
-            </button>
           </>
         )}
+        {note && <p className="hint">{note}</p>}
+        {error && <p className="error">{error}</p>}
       </section>
 
       <section className="panel">
-        <h2>Export</h2>
-        <p className="hint">Download current roster as member × category matrix with tiers.</p>
-        <button type="button" className="primary" onClick={handleExport} disabled={exporting}>
-          {exporting ? "Generating..." : "Download CSV"}
+        <h2>Export results</h2>
+        <p className="hint">Everyone&apos;s points per category, total and tier, as a spreadsheet.</p>
+        <button type="button" className="primary" disabled={busy} onClick={() => void exportCsv()}>
+          Download CSV
         </button>
       </section>
     </>

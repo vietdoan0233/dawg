@@ -369,6 +369,9 @@ isOneToOne: false
 "hook_custom_access_token":
 { Args: { "event": Json }; Returns: Json
                            },
+"import_apply":
+{ Args: { "p_adjustments": Json,"p_categories": Json,"p_guild_id": number,"p_members": Json,"p_rules": Json,"p_tasks": Json,"p_tiers": Json }; Returns: Json
+                           },
 "is_member":
 { Args: { "p_guild_id": number }; Returns: boolean
                            },
