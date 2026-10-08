@@ -25,6 +25,7 @@ const PATHS: Record<string, string> = {
   qr: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2v2M14 18h2v2M18 18h2v2h-2",
   trophy: "M8 4h8v5a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M9 21h6M10 17h4v4h-4",
   map: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
+  home: "M3 11.5 12 4l9 7.5M5.5 10v10h5v-6h3v6h5V10",
   logout: "M14 4h5v16h-5M10 12h10M6 8l-4 4 4 4",
   camera: "M4 8h3l2-3h6l2 3h3v11H4zM12 10a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z",
   image: "M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15.5 8.5a1 1 0 1 0 0 .1",

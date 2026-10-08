@@ -91,7 +91,7 @@ em { font-style: normal; font-size: 0.8em; color: var(--muted); padding: 1px 8px
 .screen { position: fixed; inset: 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); animation: page-in 0.45s var(--ease-out); }
 /* each screen (route, login → home, role switch) and each staff tab mounts fresh, so this plays on every page change */
 @keyframes page-in { from { opacity: 0; transform: translateY(14px); } }
-.screen.fuksi, .screen.staff { grid-template-rows: auto auto minmax(0, 1fr); }
+.screen.staff { grid-template-rows: auto auto minmax(0, 1fr); }
 .center-msg { display: grid; place-items: center; padding: 24px; text-align: center; }
 .loading-rune { font-family: var(--font-display); font-size: 1.2rem; color: var(--gold); animation: shimmer 1.6s ease-in-out infinite; }
 @keyframes shimmer { 50% { opacity: 0.45; } }
@@ -146,20 +146,99 @@ em { font-style: normal; font-size: 0.8em; color: var(--muted); padding: 1px 8px
 .panel h2 { display: flex; align-items: center; gap: 8px; }
 .panel > button { justify-self: start; }
 
-/* ── track chips (fuksi) ──────────────────────────────────────────────────── */
-.tracks { display: flex; gap: 8px; padding: 10px 12px; overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--line); background: rgb(18 15 12 / 0.7); z-index: 4; }
-.tracks::-webkit-scrollbar { display: none; }
-.track {
-  --c-hi: color-mix(in oklab, var(--c), white 40%);
-  flex: none; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 0.92rem; white-space: nowrap;
-  background:
-    linear-gradient(90deg, color-mix(in oklab, var(--c-hi) 70%, transparent) var(--pct), transparent var(--pct)) bottom / 100% 3px no-repeat,
-    var(--surface);
+/* ── fuksi home (SDD §11.2) ───────────────────────────────────────────────── */
+.home {
+  overflow-y: auto; overflow-x: hidden; padding: 20px max(16px, calc((100% - 1120px) / 2)) 120px;
+  display: grid; gap: 20px; align-content: start; animation: page-in 0.35s var(--ease-out);
 }
-.track svg { color: var(--c-hi); }
-.track-pts { color: var(--muted); font-variant-numeric: tabular-nums; }
-.track.done { border-color: color-mix(in oklab, var(--c-hi) 70%, transparent); }
-.track.done .track-pts { color: var(--good); }
+.home-col { display: grid; gap: 20px; align-content: start; min-width: 0; }
+@media (min-width: 960px) { .home { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 24px; } }
+.home .panel { width: 100%; }
+.home .panel > button { justify-self: stretch; }
+
+.goal {
+  display: grid; justify-items: center; gap: 18px; padding: 22px 18px; border-radius: 24px; border: 1px solid var(--line); text-align: center;
+  background: radial-gradient(420px 220px at 50% 0%, rgb(232 184 74 / 0.1), transparent 70%), var(--surface);
+}
+.goal-text { display: grid; gap: 10px; justify-items: center; min-width: 0; }
+.goal-text h1 { font-size: 1.5rem; color: var(--gold-2); text-wrap: balance; }
+.goal-text p { color: var(--muted); text-wrap: pretty; }
+@media (max-width: 599px) { .goal { gap: 12px; padding: 18px 14px; } .goal .hub { zoom: 0.78; } .goal-text h1 { font-size: 1.3rem; } }
+.chips, .ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+@media (min-width: 600px) {
+  .goal { grid-template-columns: auto minmax(0, 1fr); justify-items: start; text-align: left; gap: 28px; padding: 24px 28px; }
+  .goal-text { justify-items: start; }
+  .goal .chips, .goal .ladder { justify-content: flex-start; }
+}
+.chips li {
+  --c-hi: color-mix(in oklab, var(--c, var(--gold)), white 40%);
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 0.88rem;
+  color: var(--c-hi); border: 1px solid color-mix(in oklab, var(--c-hi) 45%, transparent); font-variant-numeric: tabular-nums;
+}
+.ladder li { font-size: 0.8rem; padding: 2px 9px; border-radius: 999px; color: var(--muted); border: 1px dashed var(--line); font-family: var(--font-display); }
+.ladder li.reached { color: var(--gold-ink); background: var(--gold); border: 1px solid var(--gold); }
+.ladder li.next { color: var(--gold-2); border: 1px solid color-mix(in oklab, var(--gold) 60%, var(--line)); }
+
+.stats { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.stats li { display: grid; gap: 2px; padding: 14px 16px; border-radius: 18px; border: 1px solid var(--line); background: var(--surface); }
+.stats b { font-size: 1.6rem; font-weight: 700; line-height: 1.1; color: var(--gold-2); font-variant-numeric: tabular-nums; }
+.stats span { color: var(--muted); font-size: 0.9rem; }
+.stats .up { font-style: normal; color: var(--good); font-variant-numeric: tabular-nums; }
+
+.home .section-title { margin: 0 0 10px; }
+.cat-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 46%), 1fr)); gap: 10px; }
+.cat-card {
+  --c-hi: color-mix(in oklab, var(--c), white 40%);
+  width: 100%; height: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "icon pts" "name name" "bar bar" "sub sub";
+  justify-items: start; align-items: center; gap: 8px 10px; padding: 14px; border-radius: 18px; text-align: left;
+  background: linear-gradient(160deg, color-mix(in oklab, var(--c) 14%, var(--surface)), var(--surface) 70%);
+}
+@media (hover: hover) { .cat-card:hover { border-color: color-mix(in oklab, var(--c-hi) 60%, var(--line)); box-shadow: 0 10px 26px rgb(0 0 0 / 0.35); } }
+.cat-icon { grid-area: icon; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--c-hi); background: color-mix(in oklab, var(--c) 22%, var(--bg)); }
+.cat-pts { grid-area: pts; justify-self: end; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cat-name { grid-area: name; font-family: var(--font-display); font-weight: 700; line-height: 1.2; text-wrap: balance; }
+.cat-bar { grid-area: bar; width: 100%; height: 6px; border-radius: 6px; background: linear-gradient(90deg, var(--c-hi) var(--pct), #2f271f var(--pct)); }
+.cat-sub { grid-area: sub; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cat-wait { color: var(--wait); }
+.cat-card.done { border-color: color-mix(in oklab, var(--c-hi) 55%, transparent); }
+.cat-card.done .cat-sub { color: var(--good); }
+
+.leaders li.me { margin: 0 -8px; padding: 6px 8px; border-radius: 12px; background: rgb(232 184 74 / 0.08); outline: 1px solid color-mix(in oklab, var(--gold) 40%, transparent); }
+.leaders li.me .name { color: var(--gold-2); font-weight: 700; }
+.leaders li.gap { position: relative; margin-top: 12px; }
+.leaders li.gap::before { content: "⋯"; position: absolute; left: 8px; top: -24px; color: var(--muted); }
+.offline { margin-left: auto; font-family: var(--font-body); font-size: 0.78rem; font-weight: 400; color: var(--wait); padding: 1px 8px; border: 1px solid currentColor; border-radius: 999px; }
+.activity { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.activity li { padding: 4px 0 4px 12px; border-left: 3px solid var(--c); font-size: 0.95rem; color: var(--muted); text-wrap: pretty; }
+.activity b { color: var(--fg); font-weight: 500; }
+.activity strong { color: var(--gold-2); font-variant-numeric: tabular-nums; }
+
+/* ── tree view + category rail: 56 px icons on phones, names and points from 720 px ── */
+.tree-view { display: grid; grid-template-columns: 56px minmax(0, 1fr); min-height: 0; animation: page-in 0.35s var(--ease-out); }
+.rail {
+  display: flex; flex-direction: column; gap: 4px; padding: 8px 4px 110px; overflow-y: auto; scrollbar-width: none; z-index: 4;
+  border-right: 1px solid var(--line); background: rgb(18 15 12 / 0.85);
+}
+.rail::-webkit-scrollbar { display: none; }
+.rail-item {
+  --c-hi: color-mix(in oklab, var(--c, var(--gold)), white 40%);
+  flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; justify-content: stretch; gap: 10px;
+  min-height: 48px; padding: 6px 12px; border-color: transparent; background: transparent; color: var(--muted); text-align: left;
+}
+.rail-item svg { color: var(--c-hi); }
+.rail-item.cat { background: linear-gradient(90deg, color-mix(in oklab, var(--c-hi) 70%, transparent) var(--pct), transparent var(--pct)) 50% calc(100% - 5px) / calc(100% - 20px) 3px no-repeat, linear-gradient(#3a2f25, #3a2f25) 50% calc(100% - 5px) / calc(100% - 20px) 3px no-repeat; }
+.rail-item:hover { color: var(--fg); background-color: var(--surface-2); }
+.rail-item[aria-current="true"] { color: var(--fg); background-color: color-mix(in oklab, var(--c) 24%, var(--surface)); border-color: color-mix(in oklab, var(--c-hi) 60%, transparent); }
+.rail-item:first-child { margin-bottom: 6px; color: var(--fg); }
+.rail-item:first-child svg { color: var(--gold); }
+.rail-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rail-pts { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+.rail-item.done .rail-pts { color: var(--good); }
+@media (max-width: 719px) {
+  .rail-item { grid-template-columns: auto; justify-content: center; padding: 6px; }
+  .rail-name, .rail-pts { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (min-width: 720px) { .tree-view { grid-template-columns: 248px minmax(0, 1fr); } .rail { padding: 12px 8px 24px; } }
 
 .hub {
   position: relative; width: 180px; height: 180px; border-radius: 50%; display: grid; place-content: center; justify-items: center; text-align: center;

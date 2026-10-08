@@ -7,6 +7,7 @@ import { StaffHome } from "@/components/StaffHome";
 import { TopBar } from "@/components/TopBar";
 import { db } from "@/lib/supabase";
 import { useMe } from "@/lib/useMe";
+import { Suspense } from "react";
 
 export default function Home() {
   const { loading, me, guilds, error, selectGuild } = useMe();
@@ -52,5 +53,10 @@ export default function Home() {
 
   const bar = <TopBar me={me} guilds={guilds} onGuild={selectGuild} />;
   // key: remount per member, so switching users never shows the previous member's data
-  return me.role === "fuksi" ? <FuksiHome key={me.memberId} me={me} bar={bar} /> : <StaffHome key={me.memberId} me={me} bar={bar} />;
+  return me.role === "fuksi" ? (
+    // Suspense: FuksiHome reads the URL (?cat=) with useSearchParams
+    <Suspense>
+      <FuksiHome key={me.memberId} me={me} bar={bar} />
+    </Suspense>
+  ) : <StaffHome key={me.memberId} me={me} bar={bar} />;
 }
