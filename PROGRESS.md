@@ -20,6 +20,8 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 Slices 1–4 prototypes and the UI are merged into `main`; they went in without PRs.
 Database tests: 9 files, 241/241 pass on `slice/3-4-hardening` (`supabase db reset` + `supabase test db`, 2026-10-08).
 
+**Demo rooms (2026-10-08):** `npm run demo:sandbox` (`supabase/demo-sandbox.sql`, demo databases only) gives every visitor their own copy of the demo guild; the QR code should open `/?fresh=1` so each scan starts a new room.
+
 ## Slice 1: walking skeleton (merged)
 
 **Done**

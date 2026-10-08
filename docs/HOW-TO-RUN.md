@@ -107,6 +107,18 @@ npm run demo:crowd
 It prints the top of the leaderboard when it is done. Nobody in the crowd is a real person. To remove the crowd, run
 `npx supabase db reset`.
 
+### Optional: give everyone their own demo room
+
+If many people try the demo at once (everyone scans the same QR code), they would all click around in the same
+guild. After the crowd step above, run this once:
+```
+npm run demo:sandbox
+```
+From then on every visitor gets their own copy of the demo guild, crowd included ("Your own demo room #n" under
+**Choose your character**). Opening the app with `?fresh=1` at the end of the address (put that in the QR code)
+always starts a brand-new room; a reload keeps the same one. Demo databases only, never a real guild's.
+`npx supabase db reset` removes the rooms. `npx supabase test db` expects a database without it (reset first).
+
 ---
 
 ## Next time you want to use it

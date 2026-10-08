@@ -127,6 +127,7 @@ em { font-style: normal; font-size: 0.8em; color: var(--muted); padding: 1px 8px
 .hero p { color: var(--muted); font-size: 1.1rem; }
 .characters { width: min(880px, 100%); display: grid; gap: 16px; }
 .characters h2 { text-align: center; color: var(--muted); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.14em; }
+.characters > .hint { text-align: center; }
 .character-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(190px, 40%), 1fr)); gap: 12px; }
 .character {
   display: grid; justify-content: stretch; justify-items: start; gap: 4px; padding: 18px; min-height: 120px; text-align: left; border-radius: 18px;
