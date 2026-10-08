@@ -360,6 +360,9 @@ isOneToOne: false
 "current_season":
 { Args: { "p_guild_id": number }; Returns: number
                            },
+"duplicate_photos":
+{ Args: { "p_ids": (number)[] }; Returns: number[]
+                           },
 "has_role":
 { Args: { "p_guild_id": number,"p_roles": (string)[] }; Returns: boolean
                            },
@@ -368,6 +371,9 @@ isOneToOne: false
                            },
 "hook_custom_access_token":
 { Args: { "event": Json }; Returns: Json
+                           },
+"import_apply":
+{ Args: { "p_adjustments": Json,"p_categories": Json,"p_guild_id": number,"p_members": Json,"p_rules": Json,"p_tasks": Json,"p_tiers": Json }; Returns: Json
                            },
 "is_member":
 { Args: { "p_guild_id": number }; Returns: boolean
@@ -396,6 +402,9 @@ isOneToOne: false
                            },
 "proof_owner":
 { Args: { "p_name": string }; Returns: (number)[]
+                           },
+"purge_photos":
+{ Args: Record<PropertyKey, never>; Returns: string[]
                            },
 "required_missing":
 { Args: { "p_member_id": number }; Returns: boolean

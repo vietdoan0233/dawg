@@ -165,9 +165,9 @@ begin
   ) d(title, text)
   where t.guild_id = g and t.title = d.title;
 
-  -- events run "now" so the demo check-in is inside the +-2 h window whenever the seed runs
+  -- events run from now for 60 days, so the demo check-in stays inside the +-2 h window on pitch day too
   insert into events (guild_id, season_id, task_id, title, starts_at, ends_at)
-  select g, s, t.id, t.title, now() - interval '1 hour', now() + interval '6 hours'
+  select g, s, t.id, t.title, now() - interval '1 hour', now() + interval '60 days'
     from tasks t where t.guild_id = g and t.title in ('Captain''s Party', 'Sitsit');
 
   -- Demo roster
