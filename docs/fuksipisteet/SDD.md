@@ -20,7 +20,7 @@ Per-task reviewer: `tasks.reviewer` = `tutor` (default) or `captain`. Use `capta
 | Area | Choice |
 |---|---|
 | App | Plain responsive Next.js (App Router) on Vercel. No PWA. |
-| Photo capture | `<input type="file" capture>` → canvas re-encode JPEG ≤1600px (strips EXIF) → `crypto.subtle` SHA-256 |
+| Photo capture | `<input type="file" capture>` → canvas re-encode JPEG ≤1600px (strips EXIF); SHA-256 of the stored file computed server-side by the `purge-photos` job (the phone's hash is ignored) |
 | QR | Fuksi QR drawn on-device by `qrcode` from a localStorage-cached code. Organizer scans with `jsqr`. |
 | Backend | Supabase, EU region: Postgres, Auth, RLS, Storage, pg_cron, 2 Edge Functions |
 | Auth | Email 6-digit OTP, `@aalto.fi` via auth hook, custom SMTP + raised rate limits |

@@ -6,7 +6,7 @@ import type { Me } from "@/lib/useMe";
 import { chime } from "@/lib/fx";
 import { Icon } from "./Icon";
 
-type Item = { id: number; who: string; title: string; note: string | null; photo: string | null; min: number; max: number };
+type Item = { id: number; who: string; title: string; note: string | null; photo: string | null; dup: boolean; min: number; max: number };
 
 // Tutor / captain queue: the pending submissions RLS lets the caller see. Points default to the node's min.
 export function ReviewQueue({ me }: { me: Me }) {
@@ -37,11 +37,15 @@ export function ReviewQueue({ me }: { me: Me }) {
     const url = new Map((signed.data ?? []).map((x) => [x.path, x.signedUrl]));
     const task = new Map(tasks.data.map((t) => [t.id, t]));
     const name = new Map(members.data.map((m) => [m.id, m.display_name]));
+    // same photo bytes as another submission in the guild (the server hashes a photo within ~10 min of upload)
+    const dups = await client.rpc("duplicate_photos", { p_ids: subs.data.flatMap((s) => (s.photo_path ? [s.id] : [])) });
+    if (dups.error) throw new Error(dups.error.message);
+    const dup = new Set(dups.data);
     return subs.data.flatMap((s) => {
       const t = task.get(s.task_id);
       // tutors review tutor-reviewed nodes only; captain-reviewed ones belong to the captain
       if (!t || (t.reviewer === "captain" && me.role !== "captain")) return [];
-      return [{ id: s.id, who: name.get(s.member_id) ?? "?", title: t.title, note: s.note, photo: (s.photo_path && url.get(s.photo_path)) || null, min: t.points_min, max: t.points_max }];
+      return [{ id: s.id, who: name.get(s.member_id) ?? "?", title: t.title, note: s.note, photo: (s.photo_path && url.get(s.photo_path)) || null, dup: dup.has(s.id), min: t.points_min, max: t.points_max }];
     });
   }, [me.guildId, me.role]);
 
@@ -123,6 +127,7 @@ function QueueRow({ item, onChanged }: { item: Item; onChanged: () => void }) {
         {item.note && <p className="note">“{item.note}”</p>}
         {/* eslint-disable-next-line @next/next/no-img-element -- signed storage URL */}
         {item.photo && <img className="proof" src={item.photo} alt={`Proof photo from ${item.who}`} />}
+        {item.dup && <p className="error">Same photo as another submission. Check before approving.</p>}
       </div>
       {item.max > item.min && (
         <div className="stepper">

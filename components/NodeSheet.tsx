@@ -6,8 +6,6 @@ import { db } from "@/lib/supabase";
 import type { Me } from "@/lib/useMe";
 import { Icon } from "./Icon";
 
-const hex = (buf: ArrayBuffer) => Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, "0")).join("");
-
 export const nodeStatus = (node: OpenNode) =>
   (node.approved >= node.max_repeats
     ? "Completed"
@@ -50,12 +48,9 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
     setError(null);
     try {
       let path: string | undefined;
-      let sha: string | undefined;
       if (photo) {
-        // the one direct client write (ARCHITECTURE-SIMPLE.md rule 1): into the caller's own <guild>/<member>/ folder
-        // ponytail: the hash is computed on the phone, so the duplicate check trusts it; slice 4 moves it server-side.
-        // crypto.subtle needs https or localhost: on plain-http LAN this throws and shows the error below.
-        sha = hex(await crypto.subtle.digest("SHA-256", await photo.arrayBuffer()));
+        // the one direct client write (ARCHITECTURE-SIMPLE.md rule 1): into the caller's own <guild>/<member>/ folder.
+        // No hash from the phone: the purge-photos job hashes the stored file for the duplicate flag.
         path = `${me.guildId}/${me.memberId}/${crypto.randomUUID()}`;
         const up = await db().storage.from("proofs").upload(path, photo, { contentType: photo.type });
         if (up.error) return setError({ field: "photo", text: up.error.message });
@@ -64,7 +59,6 @@ export function NodeSheet({ me, node, cat, onClose, onSent }: { me: Me; node: Op
         p_task_id: node.id,
         p_note: note.trim() || undefined,
         p_photo_path: path,
-        p_photo_sha256: sha,
       });
       if (error) return setError({ text: friendly(error.message) });
       chime("send");

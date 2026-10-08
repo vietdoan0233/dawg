@@ -10,15 +10,15 @@ The app is built in 5 steps called **slices**. Each slice is a small working pie
 |---|---|---|
 | 1. Walking skeleton | Demo login → fuksi sees their map → submits a task → tutor approves → node lights up → projector shows it | **Done**, in `main`. Seed now holds the real Data Guild map (55 nodes); a few values still unconfirmed |
 | 2. Auth & hardening | Real email login, invites, roles, more security tests | **Done**, in `main`. Needs production email + auth hooks before a pilot |
-| 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Prototype**, in `main`. See shortcuts below |
-| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Prototype**, in `main`. No 30-day purge, the server doesn't compute the photo hash |
+| 3. Check-in | Organizer scans a QR code at an event → point is given (works offline) | **Hardened** on branch `slice/3-4-hardening`: scan time saved for audit, replay tests. See shortcuts below |
+| 4. Photos | Fuksi uploads a proof photo, tutor approves it and picks the points | **Hardened** on branch `slice/3-4-hardening`: 30-day purge, server-side hash + duplicate flag, upload quota |
 | 5. Import/export + polish | Captain imports the spreadsheet, exports results, reveals secret nodes | **Done** on branch `slice/5-import-export-finish`: roster import (AI column mapping, headers only), results export, reveal, UI polish |
 | UI: skill tree home | The fuksi's home screen is their skill tree, on real data | **Done**, in `main` |
 
-**Next up:** hardening the slice 3–4 prototypes (see the shortcut list).
+**Next up:** teammate review of `slice/5-import-export-finish` and `slice/3-4-hardening` (draft PR), then merge.
 
-Everything is merged into `main` and pushed; the merged branches are deleted. They went in without PRs.
-Database tests: 8 files, 214/214 pass (`supabase db reset` + `supabase test db`, 2026-10-08).
+Slices 1–4 prototypes and the UI are merged into `main`; they went in without PRs.
+Database tests: 9 files, 241/241 pass on `slice/3-4-hardening` (`supabase db reset` + `supabase test db`, 2026-10-08).
 
 ## Slice 1: walking skeleton (merged)
 
@@ -51,14 +51,42 @@ What was added:
   and scans wait on the phone when offline), photo upload, photos and "Approve all" in the review queue, and a reveal panel for the captain.
 
 Known prototype shortcuts (fix before a real pilot):
-- Photos are never deleted yet (needs the 30-day purge function).
-- Photo duplicate check trusts the hash the phone sends.
+- ~~Photos are never deleted yet~~: fixed in `slice/3-4-hardening` (30-day purge job).
+- ~~Photo duplicate check trusts the hash the phone sends~~: fixed in `slice/3-4-hardening` (the server hashes the stored file).
 - The QR camera only works where the browser has a built-in QR reader (Chrome on Android). Elsewhere you type the code.
 - Captain can only *reveal* a node, not edit it yet.
-- No limit on how many photos one person uploads (needs the purge job or a quota).
+- ~~No limit on how many photos one person uploads~~: fixed in `slice/3-4-hardening` (20 per member per 24 h).
 - ~~QR codes never change~~: fixed in slice 2 (`rotate_my_code`, "Make a new QR code").
 - Any tutor can check in any fuksi in the guild, not only their own group. Probably fine; confirm with the team.
-- The check-in time the phone reports is checked but not saved, so a late check-in can't be audited yet.
+- ~~The check-in time the phone reports is checked but not saved~~: fixed in `slice/3-4-hardening` (kept as `reviewed_at`).
+- Photos are uploaded as-is: the SDD's canvas re-encode (≤1600 px, strips EXIF/GPS) is not built yet.
+
+## Slices 3–4 hardening (branch `slice/3-4-hardening`, built 2026-10-08)
+
+Migration `0007_photo_checkin_hardening.sql`, edge function `purge-photos`, tests `09_hardening` (23).
+- **Check-in audit:** an awarded check-in keeps the phone's scan time as `reviewed_at`; `created_at` is when it
+  synced. A late (queued) check-in shows as a gap between the two. Tests now cover a replayed queued scan
+  (`duplicate`, one row, first scan time kept) and `limit_reached` coming back as a result.
+- **Photo purge (30 days):** pg_cron calls the `purge-photos` edge function every 10 minutes. It clears `photo_path`
+  on submissions older than 30 days and deletes, through the Storage API, every proof file no submission points at
+  once it is a day old (purged photos and abandoned uploads). The hash is kept.
+- **Duplicate photos:** the phone no longer sends a hash (`submit_task` ignores it). The same job downloads each new
+  photo and stores its SHA-256. The review queue shows "Same photo as another submission" (`duplicate_photos`).
+  Limits: the flag appears up to ~10 minutes after upload, and only exact copies match (a re-saved or cropped
+  photo does not); the tutor still looks at every photo.
+- **Upload quota:** at most 20 photo uploads per member per 24 h (storage insert policy). Parallel uploads at the
+  limit can slip one or two past it.
+- Tried locally with curl: upload + submit as two fuksis, job hashes both (matches `sha256sum`), tutor sees both
+  flagged, a 31-day-old photo is purged (row cleared, file gone), the 21st upload is refused, and the cron job's own
+  call (pg_net → function) returns 200. The review-queue flag was not clicked through in a browser.
+
+**Before a pilot (needs you), per environment:**
+```sql
+select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
+select vault.create_secret('<long random secret>', 'purge_photos_secret');
+```
+then `supabase secrets set PURGE_PHOTOS_SECRET=<same secret>` and `supabase functions deploy purge-photos`
+(`verify_jwt = false` comes from `config.toml`). Until both Vault secrets exist the cron job does nothing.
 
 ## Slice 2: real login (merged, built 2026-10-06)
 
@@ -143,5 +171,5 @@ The AI call itself was not exercised locally (no key here); the no-key fallback 
 - Some tables (`member_codes`, `invites`, `ai_usage`) don't carry `guild_id` + `season_id`. Fix it or write the exception in the SDD.
 - No test yet for two people submitting at the same moment.
 - A rejected task can be resubmitted without limit. Decide if that's OK.
-- Duplicate-photo check trusts the hash the phone sends; slice 4 must compute it on the server.
+- ~~Duplicate-photo check trusts the hash the phone sends~~: fixed in `slice/3-4-hardening`.
 - The rank view gets slow at a few hundred members; fine for the demo.
